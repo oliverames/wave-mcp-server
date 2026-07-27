@@ -36,7 +36,7 @@
       "Create a Wave invoice for Acme Corp for 10 hours of consulting.",
       "Log a $45.99 office supplies expense paid from Business Checking."
     ],
-    "brandColor": "#1f6fd0",
+    "brandColor": "#328ff8",
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/icon.png"
   },

@@ -23,9 +23,9 @@ export function layout(title, body) {
 <meta name="robots" content="noindex">
 <title>${escapeHtml(title)}</title>
 <style>
-  :root { color-scheme: light dark; --fg: #16202c; --muted: #5c6b7a; --bg: #f6f8fb; --card: #fff; --accent: #1f6fd0; --line: #dde4ec; }
+  :root { color-scheme: light dark; --fg: #16202c; --muted: #5c6b7a; --bg: #f6f8fb; --card: #fff; --accent: #328ff8; --line: #dde4ec; }
   @media (prefers-color-scheme: dark) {
-    :root { --fg: #e8eef5; --muted: #9fb0c2; --bg: #0f1620; --card: #16202c; --accent: #63a4f0; --line: #26374a; }
+    :root { --fg: #e8eef5; --muted: #9fb0c2; --bg: #0f1620; --card: #16202c; --accent: #76c3fc; --line: #26374a; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 2.5rem 1.25rem; background: var(--bg); color: var(--fg);

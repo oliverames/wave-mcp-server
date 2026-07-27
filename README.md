@@ -409,9 +409,12 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Not Affiliated With Wave
 
-An independent project. Wave Financial Inc. owns the Wave name and marks.
-Originally forked from [vinnividivicci/wave_mcp](https://github.com/vinnividivicci/wave_mcp),
-then rewritten.
+An independent project, not affiliated with, endorsed by, or sponsored by Wave
+Financial Inc. Wave Financial Inc. owns the Wave name, logo, and marks; the icon
+above is theirs and is used only to identify the service this server connects
+to. Originally forked from
+[vinnividivicci/wave_mcp](https://github.com/vinnividivicci/wave_mcp), then
+rewritten.
 
 ---
 

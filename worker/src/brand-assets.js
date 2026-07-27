@@ -15,4 +15,4 @@ export const CONNECTOR_RESOURCE_METADATA = {
 // Wave Financial Inc. owns the Wave name and marks; this is an independent
 // connector, so the wordmark is never reproduced.
 export const DISCLAIMER =
-  "An independent connector for Wave Accounting. Not affiliated with, endorsed by, or sponsored by Wave Financial Inc.";
+  "An independent connector for Wave Accounting. Not affiliated with, endorsed by, or sponsored by Wave Financial Inc., which owns the Wave name, logo, and marks.";
