@@ -375,11 +375,12 @@ index.js                     Single-file server: client, 74 tools, 7 resources
 scripts/
   smoke-validate-graphql.mjs Schema-check every query against live Wave
   smoke-list-tools.mjs       Start over stdio and enumerate what is advertised
+  smoke-packed-install.mjs   Pack, install, and launch the way npx does
   sync-plugin-metadata.mjs   Propagate the version to every host manifest
   check-release-consistency  Fail the build when anything disagrees
   build-mcpb.mjs             Desktop bundle
 worker/                      Hosted OAuth connector
-test/unit.test.mjs           54 tests, no network
+test/unit.test.mjs           57 tests, no network
 ```
 
 The tool layer lives in one file on purpose. It is imported unchanged by the
@@ -398,8 +399,9 @@ at all, which catches a field Wave renames before a user does.
 
 ```bash
 npm install
-npm test                  # 54 unit tests, no network
+npm test                  # 57 unit tests, no network
 npm run smoke:list-tools  # start over stdio, enumerate tools
+npm run smoke:packed      # pack, install, and launch via the bin symlink
 npm run smoke:schema      # validate every query against live Wave
 npm run release:check     # version parity across 8 manifests
 npm run build:mcpb        # desktop bundle

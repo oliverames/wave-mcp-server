@@ -17,8 +17,9 @@ The unit tests need no Wave account and no network.
 
 ```bash
 node --check index.js     # syntax
-npm test                  # 54 unit tests
+npm test                  # 57 unit tests
 npm run smoke:list-tools  # starts over stdio, enumerates tools
+npm run smoke:packed      # packs, installs, launches via the bin symlink
 npm run smoke:schema      # validates every query against live Wave
 npm run release:check     # version parity across manifests
 ```
@@ -33,6 +34,12 @@ If you touched `worker/`:
 npm ci --prefix worker
 npm test --prefix worker
 ```
+
+`smoke:packed` matters more than its name suggests. npm installs the bin as a
+relative symlink, so anything that reasons about `process.argv[1]` or
+`import.meta.url` behaves differently under `npx` than under `node index.js`.
+That difference once shipped a server that started and sat silent. If you touch
+module-level startup code, run this one.
 
 ## Adding a tool
 

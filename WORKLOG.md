@@ -3,6 +3,71 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-27 - Published 1.0.0 to npm and deployed the hosted connector
+
+**What changed**: `@oliverames/mcp-server-for-wave@1.0.0` is on npm, and the
+Cloudflare Worker is live at `wave.amesvt.com`. Repo made public. Header icon
+swapped from a mark I drew to Wave's own app icon, with brand colors taken from
+their logo SVG (`#328ff8`, `#76c3fc`). `NPM_TOKEN` set on the repo so
+`.github/workflows/release.yml` can publish future tags. CI actions bumped to
+`checkout@v7` / `setup-node@v6` / `gitleaks-action@v3` to match the sibling
+repos and clear the Node 20 deprecation.
+
+**Bug found while verifying the tarball, before publish**: the server never
+started when launched through its npm bin. npm installs the bin as a *relative
+symlink*, so `process.argv[1]` is `node_modules/.bin/mcp-server-for-wave` --
+neither absolute nor the real file -- and the autostart guard comparing it to
+`import.meta.url` never matched. Every `npx` launch, which is how the README
+and all five plugin manifests tell people to run it, would have started a
+process that sat silent. Fixed with `realpathSync` on both sides. Every
+pre-existing check missed it because they all ran `node index.js` with a path
+that already matched.
+
+**Decisions made**:
+
+- Added `scripts/smoke-packed-install.mjs`, which packs, installs, and completes
+  a handshake through both declared bin names, and wired it into CI and the
+  release gate. The lesson generalizes: exercise the artifact the way a user
+  receives it, not the way a developer runs it.
+- KV namespace titled `WAVE_OAUTH_KV`, not `OAUTH_KV`. The YNAB connector
+  already owns the plain title on this Cloudflare account, and one shared
+  namespace would mix the two connectors' OAuth grants.
+- Used Wave's official app icon rather than an original mark, matching how
+  `ynab-mcp-server` ships YNAB's. Trademark posture stated explicitly in the
+  README and the connector's page footer: nominative use to identify the
+  service, no implied endorsement.
+
+**Verification**: 57 unit tests, 24 Worker tests, 64/64 GraphQL documents valid
+against live Wave, gitleaks clean, all 7 CI jobs green. Published package
+verified by `npx`-ing it cold from an empty directory: 1.9s to handshake, 30
+read-only tools, 7 resources. Worker verified against the live endpoint rather
+than the deploy output: `/mcp` 401 `invalid_token`; hostile `Origin` 403;
+`claude.ai` `Origin` 401; HSTS, `referrer-policy`, and `nosniff` present;
+`/.well-known/oauth-authorization-server` 200.
+
+**Left off at**: npm and the Worker are both live. The connector cannot
+complete a connection yet.
+
+**Open questions**:
+
+- NEW, blocking the connector: `WAVE_CLIENT_ID` and `WAVE_CLIENT_SECRET` are
+  unset. They require an OAuth application created at `developer.waveapps.com`
+  with redirect URI `https://wave.amesvt.com/callback`, which needs a Wave
+  login. Until then `/authorize` fails at the redirect and no session can
+  authenticate.
+- NEW: the OAuth scope names in `worker/src/wave-oauth.js` are a reading of
+  Wave's documentation and are unverified, since verifying them needs a
+  registered app. An invalid-scope error at the authorize redirect points here
+  first.
+- Still open: no mutation has run against a live Wave account. Schema-valid and
+  unit-tested is not the same as exercised.
+- Still open: `evaluation/evaluation.xml` carries placeholder answers, for the
+  same reason.
+- Still open: the Dockerfile is unbuilt; Docker is not installed on the
+  authoring machine.
+
+---
+
 ## 1.0.0 (2026-07-27)
 
 First release of the standalone repository.
