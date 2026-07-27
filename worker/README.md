@@ -29,6 +29,20 @@ Client → OAuthProvider ──┬─ /mcp, /sse   → WaveMCP (Durable Object p
 | `src/oauth-transient-state.js` | Single-use OAuth state, in a Durable Object |
 | `src/pages.js` | Server-rendered HTML, all values escaped |
 
+## Status
+
+Deployed at **https://wave.amesvt.com**. The infrastructure is live and the
+transport is hardened, but the connector cannot complete a connection until a
+Wave OAuth application exists and its two secrets are set (step 1 and step 3
+below). Until then `/authorize` will fail at the redirect to Wave.
+
+| Piece | State |
+|-------|-------|
+| Worker deployed, custom domain, DNS | done |
+| KV namespace (`WAVE_OAUTH_KV`) | done |
+| `COOKIE_ENCRYPTION_KEY`, `DATA_ENCRYPTION_KEY` | done |
+| `WAVE_CLIENT_ID`, `WAVE_CLIENT_SECRET` | **needed** |
+
 ## Setup
 
 1. **Create a Wave OAuth application** at
@@ -36,19 +50,25 @@ Client → OAuthProvider ──┬─ /mcp, /sse   → WaveMCP (Durable Object p
    `https://wave.amesvt.com/callback` for production, and
    `http://localhost:8787/callback` for local development.
 
-2. **Create the KV namespace** and put its id in `wrangler.jsonc`:
+2. **Create the KV namespace** and put its id in `wrangler.jsonc`. Already
+   done for this deployment (`WAVE_OAUTH_KV`,
+   `0a32afc8956846c49e7bacdef075dd15`); the title is prefixed because the YNAB
+   connector already owns the plain `OAUTH_KV` title on this account, and
+   sharing one namespace would mix the two connectors' grants:
 
    ```bash
-   npx wrangler kv namespace create OAUTH_KV
+   npx wrangler kv namespace create WAVE_OAUTH_KV
    ```
 
-3. **Set the secrets.** Never put these in `wrangler.jsonc`:
+3. **Set the secrets.** Never put these in `wrangler.jsonc`. The two
+   encryption keys are already set on this deployment; the two Wave ones are
+   not, because they come from the application in step 1:
 
    ```bash
-   npx wrangler secret put WAVE_CLIENT_ID
-   npx wrangler secret put WAVE_CLIENT_SECRET
-   npx wrangler secret put COOKIE_ENCRYPTION_KEY
-   npx wrangler secret put DATA_ENCRYPTION_KEY
+   npx wrangler secret put WAVE_CLIENT_ID       # still needed
+   npx wrangler secret put WAVE_CLIENT_SECRET   # still needed
+   npx wrangler secret put COOKIE_ENCRYPTION_KEY  # done
+   npx wrangler secret put DATA_ENCRYPTION_KEY    # done
    ```
 
    The two keys must be independent random values of 32 bytes or more:
