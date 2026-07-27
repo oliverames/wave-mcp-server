@@ -5,3 +5,4 @@ dist/
 .wrangler/
 .DS_Store
 *.log
+.handoff-*.json
