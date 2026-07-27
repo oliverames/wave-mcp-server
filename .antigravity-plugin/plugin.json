@@ -1,0 +1,24 @@
+{
+  "name": "wave-mcp-server",
+  "displayName": "Wave",
+  "version": "1.0.0",
+  "description": "Wave Accounting MCP connector for invoices, estimates, customers, products, sales taxes, payments, the chart of accounts, and double-entry bookkeeping.",
+  "author": {
+    "name": "Oliver Ames",
+    "email": "oliverames@gmail.com",
+    "url": "https://github.com/oliverames"
+  },
+  "homepage": "https://github.com/oliverames/wave-mcp-server#readme",
+  "repository": "https://github.com/oliverames/wave-mcp-server",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "wave",
+    "waveapps",
+    "accounting",
+    "invoicing",
+    "bookkeeping",
+    "small-business"
+  ],
+  "mcpServers": "./mcp_config.json"
+}

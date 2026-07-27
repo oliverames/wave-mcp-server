@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+dist
+worker
+test
+docs
+assets
+codex
+.agents
+.claude-plugin
+.hermes-plugin
+.antigravity-plugin
+*.md

@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wave-mcp-connector",
+  "main": "src/index.js",
+  // The public custom domain below is the only supported endpoint.
+  "workers_dev": false,
+  "compatibility_date": "2025-03-10",
+  // nodejs_compat lets the Worker import the shared server factory from the
+  // repo root, which is written for Node.
+  "compatibility_flags": ["nodejs_compat"],
+  // Custom domain on the amesvt.com zone: Cloudflare creates the DNS record
+  // and certificate automatically at deploy time.
+  "routes": [{ "pattern": "wave.amesvt.com", "custom_domain": true }],
+  "kv_namespaces": [
+    // OAuthProvider grant/client/token storage (props encrypted, tokens
+    // hashed), plus this connector's encrypted Wave token records.
+    // Fill in the id after `wrangler kv namespace create OAUTH_KV`.
+    { "binding": "OAUTH_KV", "id": "REPLACE_AFTER_KV_NAMESPACE_CREATE" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "MCP_OBJECT", "class_name": "WaveMCP" },
+      { "name": "OAUTH_STATE", "class_name": "OAuthTransientState" }
+    ]
+  },
+  "migrations": [
+    // SQLite-backed DO classes: required for McpAgent, allowed on the free plan.
+    { "tag": "v1", "new_sqlite_classes": ["WaveMCP"] },
+    { "tag": "v2", "new_sqlite_classes": ["OAuthTransientState"] }
+  ],
+  "vars": {
+    "CONNECTOR_BASE_URL": "https://wave.amesvt.com",
+    // Explicit browser origins allowed to call the MCP transport. Native and
+    // server-to-server clients omit Origin and remain supported.
+    "MCP_ALLOWED_ORIGINS": "https://chatgpt.com,https://claude.ai,https://chat.mistral.ai,https://lechat.mistral.ai",
+    // Never let the shared stdio module autostart or read local config here.
+    "WAVE_MCP_NO_AUTOSTART": "1",
+    "WAVE_DISABLE_AGENT_CONFIG_FALLBACK": "1"
+  }
+  // Secrets (set with `wrangler secret put`, never in this file):
+  //   WAVE_CLIENT_ID          - Wave OAuth application client id
+  //   WAVE_CLIENT_SECRET      - Wave OAuth application secret
+  //   COOKIE_ENCRYPTION_KEY   - random 32+ byte key for consent/state HMACs
+  //   DATA_ENCRYPTION_KEY     - separate random 32+ byte key for Wave tokens
+}

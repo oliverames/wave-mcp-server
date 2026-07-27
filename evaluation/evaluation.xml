@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Evaluation questions for the Wave MCP server.
+
+  IMPORTANT: the <answer> values below are PLACEHOLDERS. Wave has no public
+  demo or sandbox dataset, and these questions were written without access to
+  a Wave account, so no answer here has been verified against real data.
+  Running this file as-is will report every question wrong.
+
+  The mcp-builder evaluation process expects answers to be derived by solving
+  each question yourself against real content (Step 4, "Read-Only Content
+  Inspection"). That step needs a token this repository does not and should
+  not carry.
+
+  To use this file:
+    1. Point WAVE_ACCESS_TOKEN at a Wave business with real history.
+    2. Answer each question yourself using only the MCP tools.
+    3. Replace each placeholder <answer> with the value you derived.
+    4. Adjust date ranges to periods your business actually has data for.
+    5. Run the harness (see evaluation/README.md).
+
+  Every question is read-only: none requires a create, update, delete,
+  archive, or send operation.
+-->
+<evaluation>
+
+  <qa_pair>
+    <question>Across the whole chart of accounts, find the account subtype that Wave will not let you create new accounts under but which still has at least one account in this business. Give the subtype's display name exactly as Wave reports it.</question>
+    <answer>PLACEHOLDER: subtype display name, e.g. Retained Earnings</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Consider every invoice dated in the 2025 calendar year that still had money outstanding at the time it was last modified. Among the customers on those invoices, which one carries the largest overdue balance today? Give the customer name exactly as it appears in Wave.</question>
+    <answer>PLACEHOLDER: customer name</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>One product in this business is set up so it can be both sold to customers and bought from vendors. Identify it, then report the name of the account that is credited when it is sold. Give the account name exactly as Wave reports it.</question>
+    <answer>PLACEHOLDER: income account name</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Find the sales tax in this business whose rate has been changed at least once since it was created. What is the effective date of its most recent rate change? Use YYYY-MM-DD.</question>
+    <answer>PLACEHOLDER: date in YYYY-MM-DD</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look at every invoice that reached a fully paid state during the first half of 2025. Counting each invoice's payments, which single payment method was used most often? Answer with the Wave payment method constant, such as CHEQUE or BANK_TRANSFER.</question>
+    <answer>PLACEHOLDER: payment method constant</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Among all estimates ever created in this business, find the one that was ultimately turned into an invoice and had the highest total value. How many days elapsed between its estimate date and its expiry date? Answer with a whole number.</question>
+    <answer>PLACEHOLDER: integer number of days</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>This business has at least one customer whose billing country differs from the country its own business address is registered in. For the first such customer in alphabetical order by name, what is the two-letter ISO country code of their billing address?</question>
+    <answer>PLACEHOLDER: two-letter country code</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Identify the bank or cash account in this business holding the largest positive balance in the business's own currency. Does that account permit archiving? Answer True or False.</question>
+    <answer>PLACEHOLDER: True or False</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Take the most recently issued invoice that carries a discount. Was that discount applied as a fixed amount rather than a percentage? Answer True or False.</question>
+    <answer>PLACEHOLDER: True or False</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Consider the products in this business that have at least one default sales tax attached. Which of them has the highest unit price? Give the product name exactly as it appears in Wave.</question>
+    <answer>PLACEHOLDER: product name</answer>
+  </qa_pair>
+
+</evaluation>

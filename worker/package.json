@@ -1,0 +1,21 @@
+{
+  "name": "wave-mcp-connector",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Hosted OAuth remote MCP connector for Wave Accounting on Cloudflare Workers. Not affiliated with Wave Financial Inc.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.mjs",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "~0.8.1",
+    "agents": "~0.17.4",
+    "hono": "^4.12.27"
+  },
+  "devDependencies": {
+    "wrangler": "^4.113.0"
+  }
+}

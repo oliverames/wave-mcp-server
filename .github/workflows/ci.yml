@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18.x", "20.x", "22.x"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Syntax check
+        run: node --check index.js
+      - name: Unit tests
+        run: npm test
+      - name: Release consistency
+        run: npm run release:check
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Starts the server over stdio and enumerates its tools. No Wave
+      # credentials needed: the handshake happens before any API call.
+      - name: Tool listing over stdio
+        run: npm run smoke:list-tools
+
+  schema:
+    runs-on: ubuntu-latest
+    # Wave validates a GraphQL document before it checks authentication, so
+    # every query can be schema-checked here with no credentials. This is what
+    # catches a field renamed on Wave's side before a user does.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Validate GraphQL against the live Wave schema
+        run: npm run smoke:schema
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci --prefix worker --no-audit --no-fund
+      - name: Worker dependency audit
+        run: npm audit --prefix worker --omit=dev --audit-level=high
+      - name: Worker tests
+        run: npm test --prefix worker

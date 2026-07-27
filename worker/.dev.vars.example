@@ -1,0 +1,13 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit the real file.
+#
+# Create the OAuth application at https://developer.waveapps.com/ and set its
+# redirect URI to http://localhost:8787/callback for local development, or
+# https://wave.amesvt.com/callback in production.
+
+WAVE_CLIENT_ID=your_wave_oauth_client_id
+WAVE_CLIENT_SECRET=your_wave_oauth_client_secret
+
+# Two independent random keys, 32+ bytes each. Generate with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+COOKIE_ENCRYPTION_KEY=replace_with_random_32_byte_key
+DATA_ENCRYPTION_KEY=replace_with_a_different_random_32_byte_key

@@ -1,0 +1,59 @@
+{
+  "name": "@oliverames/mcp-server-for-wave",
+  "version": "1.0.0",
+  "description": "Local MCP server for Wave Accounting: invoices, estimates, customers, products, taxes, and bookkeeping",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oliverames/wave-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oliverames/wave-mcp-server/issues"
+  },
+  "homepage": "https://github.com/oliverames/wave-mcp-server#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "wave",
+    "waveapps",
+    "accounting",
+    "invoicing",
+    "bookkeeping",
+    "small-business"
+  ],
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "mcp-server-for-wave": "index.js",
+    "wave-mcp-server": "index.js"
+  },
+  "files": [
+    "index.js",
+    "scripts/",
+    "assets/icon.png",
+    "docs/hosted-oauth-connector.md",
+    "docs/privacy.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "deps:ensure": "node --input-type=module -e \"await import('@modelcontextprotocol/sdk/server/mcp.js')\" >/dev/null 2>&1 || npm ci --silent --no-audit --no-fund",
+    "pretest": "npm run deps:ensure",
+    "test": "node --test test/unit.test.mjs",
+    "presmoke:list-tools": "npm run deps:ensure",
+    "smoke:list-tools": "node scripts/smoke-list-tools.mjs",
+    "presmoke:schema": "npm run deps:ensure",
+    "smoke:schema": "node scripts/smoke-validate-graphql.mjs",
+    "sync:plugin": "node scripts/sync-plugin-metadata.mjs",
+    "version": "npm run sync:plugin && git add .agents/plugins/marketplace.json .claude-plugin/marketplace.json .claude-plugin/plugin.json codex/.codex-plugin/plugin.json codex/.codex-plugin/mcp.json .hermes-plugin/marketplace.json .hermes-plugin/plugin.json .hermes-plugin/mcp.json .antigravity-plugin/marketplace.json .antigravity-plugin/plugin.json .antigravity-plugin/mcp_config.json .mcp.json",
+    "release:check": "node scripts/check-release-consistency.mjs",
+    "release:check:registry": "node scripts/check-release-consistency.mjs --registry",
+    "build:mcpb": "node scripts/build-mcpb.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  }
+}

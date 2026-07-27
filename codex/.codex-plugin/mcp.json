@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "wave-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@oliverames/mcp-server-for-wave@latest"
+      ],
+      "env": {
+        "WAVE_ACCESS_TOKEN": "${WAVE_ACCESS_TOKEN}",
+        "WAVE_BUSINESS_ID": "${WAVE_BUSINESS_ID}",
+        "WAVE_OP_PATH": "${WAVE_OP_PATH}",
+        "OP_SERVICE_ACCOUNT_TOKEN": "${OP_SERVICE_ACCOUNT_TOKEN}",
+        "WAVE_ALLOW_WRITES": "1"
+      }
+    }
+  }
+}

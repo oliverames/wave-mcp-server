@@ -1,0 +1,32 @@
+# Secret scanning configuration.
+#
+# The repo carries no credentials: tokens come from the environment, a token
+# file, or 1Password at runtime. These rules exist to keep it that way.
+
+title = "wave-mcp-server"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "wave-access-token"
+description = "Wave OAuth2 access token"
+regex = '''(?i)wave[_-]?access[_-]?token["'\s:=]+[A-Za-z0-9._~+/-]{20,}'''
+tags = ["wave", "token"]
+
+[allowlist]
+description = "Placeholders, docs, and fixtures that only look like secrets"
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)test/''',
+  '''(^|/)docs/''',
+]
+regexes = [
+  # Env-var interpolation in MCP configs, not a literal value.
+  '''\$\{WAVE_[A-Z_]+\}''',
+  '''your_token_here''',
+  '''unit-test-token''',
+  '''smoke-test-token''',
+  '''dummy''',
+]

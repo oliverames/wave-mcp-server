@@ -1,0 +1,44 @@
+{
+  "name": "wave-mcp-server",
+  "version": "1.0.0",
+  "description": "Wave Accounting MCP connector for invoices, estimates, customers, products, sales taxes, payments, the chart of accounts, and double-entry bookkeeping.",
+  "author": {
+    "name": "Oliver Ames",
+    "email": "oliverames@gmail.com",
+    "url": "https://github.com/oliverames"
+  },
+  "homepage": "https://github.com/oliverames/wave-mcp-server#readme",
+  "repository": "https://github.com/oliverames/wave-mcp-server",
+  "keywords": [
+    "mcp",
+    "wave",
+    "waveapps",
+    "accounting",
+    "invoicing",
+    "bookkeeping",
+    "small-business"
+  ],
+  "category": "finance",
+  "mcpServers": "./.codex-plugin/mcp.json",
+  "interface": {
+    "displayName": "Wave",
+    "shortDescription": "Connect Claude and Codex to Wave Accounting invoices, estimates, and books.",
+    "longDescription": "A standalone Wave Accounting MCP connector covering Wave's public GraphQL API in full: invoices and payments, estimates and deposits, customers, vendors, products, sales taxes, the chart of accounts, and double-entry bookkeeping transactions. Requires WAVE_ACCESS_TOKEN. Write tools are gated behind WAVE_ALLOW_WRITES.",
+    "developerName": "Oliver Ames",
+    "category": "Finance",
+    "capabilities": [
+      "MCP Servers",
+      "Finance"
+    ],
+    "websiteURL": "https://github.com/oliverames/wave-mcp-server#readme",
+    "defaultPrompt": [
+      "Show me every unpaid Wave invoice over $500.",
+      "Create a Wave invoice for Acme Corp for 10 hours of consulting.",
+      "Log a $45.99 office supplies expense paid from Business Checking."
+    ],
+    "brandColor": "#1f6fd0",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  },
+  "license": "MIT"
+}
