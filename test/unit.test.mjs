@@ -412,3 +412,34 @@ test("gql deduplicates repeated fragments", () => {
 test("Money is always selected with an exact minor-unit value", () => {
   assert.match(__testables.FRAGMENTS.money, /minorUnitValue/);
 });
+
+// --- Autostart detection ---------------------------------------------------
+// npm installs the bin as a relative symlink, so a naive
+// `import.meta.url === "file://" + process.argv[1]` comparison fails and the
+// server silently never starts under npx. These cover the resolution.
+
+test("importing this module does not autostart a transport", () => {
+  // The suite imported index.js at the top and is still running, which it
+  // could not do if the import had opened stdio and blocked.
+  assert.equal(typeof __testables.isDirectRun, "function");
+  assert.equal(__testables.isDirectRun(), false);
+});
+
+test("autostart is refused when argv[1] points at something else", (t) => {
+  const original = process.argv[1];
+  t.after(() => {
+    process.argv[1] = original;
+  });
+  process.argv[1] = "/definitely/not/this/module.js";
+  assert.equal(__testables.isDirectRun(), false);
+});
+
+test("WAVE_MCP_NO_AUTOSTART suppresses autostart outright", (t) => {
+  const original = process.env.WAVE_MCP_NO_AUTOSTART;
+  t.after(() => {
+    if (original === undefined) delete process.env.WAVE_MCP_NO_AUTOSTART;
+    else process.env.WAVE_MCP_NO_AUTOSTART = original;
+  });
+  process.env.WAVE_MCP_NO_AUTOSTART = "1";
+  assert.equal(__testables.isDirectRun(), false);
+});

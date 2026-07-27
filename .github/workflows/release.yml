@@ -29,6 +29,8 @@ jobs:
         run: npm run release:check:registry
       - name: Tool listing over stdio
         run: npm run smoke:list-tools
+      - name: Packed install starts over stdio
+        run: npm run smoke:packed
 
       - name: Verify the tag matches package.json
         env:

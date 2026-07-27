@@ -61,6 +61,11 @@ jobs:
       # credentials needed: the handshake happens before any API call.
       - name: Tool listing over stdio
         run: npm run smoke:list-tools
+      # Packs, installs, and launches through the bin symlink, the way npx
+      # does. `node index.js` passes even when the published artifact is
+      # dead on arrival, so this is the check that matters for a release.
+      - name: Packed install starts over stdio
+        run: npm run smoke:packed
 
   schema:
     runs-on: ubuntu-latest

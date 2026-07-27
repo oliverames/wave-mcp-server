@@ -14,9 +14,10 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -5772,6 +5773,7 @@ export const __testables = {
   extractFromCodexToml,
   extractFromJsonMcpConfig,
   pickRuntimeKeys,
+  isDirectRun,
 };
 
 // --- Start ---
@@ -5781,15 +5783,32 @@ async function main() {
   await localWave.server.connect(new StdioServerTransport());
 }
 
-// Only autostart when run directly, so importing this module for the Worker or
-// for tests does not open a stdio transport.
-const isDirectRun =
-  !IS_CLOUDFLARE_WORKERS &&
-  !truthyFlag(globalThis.process?.env?.WAVE_MCP_NO_AUTOSTART) &&
-  globalThis.process?.argv?.[1] &&
-  import.meta.url === `file://${globalThis.process.argv[1]}`;
+/**
+ * Was this module executed directly, rather than imported?
+ *
+ * Importing must not open a stdio transport, which rules out starting
+ * unconditionally. But comparing `import.meta.url` to a raw `process.argv[1]`
+ * is wrong in the case that matters most: npm installs the bin as a *relative
+ * symlink* (`node_modules/.bin/mcp-server-for-wave`), so argv[1] is neither
+ * absolute nor the real file, and every npx launch would silently fail to
+ * start. Resolve both sides to a real absolute path before comparing.
+ */
+function isDirectRun() {
+  if (IS_CLOUDFLARE_WORKERS) return false;
+  if (truthyFlag(globalThis.process?.env?.WAVE_MCP_NO_AUTOSTART)) return false;
 
-if (isDirectRun) {
+  const invoked = globalThis.process?.argv?.[1];
+  if (!invoked) return false;
+
+  try {
+    return realpathSync(path.resolve(invoked)) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    // A missing or unreadable argv[1] means this was not a direct run.
+    return false;
+  }
+}
+
+if (isDirectRun()) {
   main().catch((error) => {
     console.error(`Fatal error starting MCP Server for Wave: ${error?.message ?? error}`);
     globalThis.process.exit(1);
