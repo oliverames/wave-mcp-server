@@ -14,8 +14,12 @@
   "kv_namespaces": [
     // OAuthProvider grant/client/token storage (props encrypted, tokens
     // hashed), plus this connector's encrypted Wave token records.
-    // Fill in the id after `wrangler kv namespace create OAUTH_KV`.
-    { "binding": "OAUTH_KV", "id": "REPLACE_AFTER_KV_NAMESPACE_CREATE" }
+    //
+    // The binding is OAUTH_KV because that is what the code reads; the
+    // namespace is titled WAVE_OAUTH_KV so it stays distinct from the YNAB
+    // connector's, which already owns the plain "OAUTH_KV" title. Sharing one
+    // namespace would mix the two connectors' grants.
+    { "binding": "OAUTH_KV", "id": "0a32afc8956846c49e7bacdef075dd15" }
   ],
   "durable_objects": {
     "bindings": [
