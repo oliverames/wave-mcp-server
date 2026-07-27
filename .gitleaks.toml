@@ -25,6 +25,9 @@ paths = [
 regexes = [
   # Env-var interpolation in MCP configs, not a literal value.
   '''\$\{WAVE_[A-Z_]+\}''',
+  # Source that reads the variable rather than hard-coding it.
+  '''process\.env\.[A-Z_]+''',
+  '''env\.[A-Z_]+''',
   '''your_token_here''',
   '''unit-test-token''',
   '''smoke-test-token''',
