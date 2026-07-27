@@ -17,7 +17,7 @@ The unit tests need no Wave account and no network.
 
 ```bash
 node --check index.js     # syntax
-npm test                  # 57 unit tests
+npm test                  # 58 unit tests
 npm run smoke:list-tools  # starts over stdio, enumerates tools
 npm run smoke:packed      # packs, installs, launches via the bin symlink
 npm run smoke:schema      # validates every query against live Wave

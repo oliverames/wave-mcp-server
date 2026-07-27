@@ -312,6 +312,19 @@ function readOnePasswordSecret(reference) {
   return token;
 }
 
+/**
+ * Strip credentials from text headed for stderr.
+ *
+ * The factory's sanitizeErrorMessage closes over the live token and is not
+ * reachable from process-level handlers, so this covers the header forms that
+ * show up in a stack trace.
+ */
+function redactTokens(value) {
+  return String(value ?? "")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED_TOKEN]")
+    .replace(/Authorization:\s*[^\r\n]+/gi, "Authorization: [REDACTED_TOKEN]");
+}
+
 function detectAgent() {
   const env = globalThis.process?.env ?? {};
   if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return "claude-code";
@@ -5774,6 +5787,7 @@ export const __testables = {
   extractFromJsonMcpConfig,
   pickRuntimeKeys,
   isDirectRun,
+  redactTokens,
 };
 
 // --- Start ---
@@ -5808,9 +5822,24 @@ function isDirectRun() {
   }
 }
 
+if (!IS_CLOUDFLARE_WORKERS) {
+  // Without these, an unhandled rejection takes the process down with no
+  // usable output, and the MCP client reports only a dead server. Sanitize
+  // first: a stack can carry the access token.
+  globalThis.process.on("uncaughtException", (error) => {
+    console.error(`Uncaught exception: ${redactTokens(error?.stack || error)}`);
+    globalThis.process.exit(1);
+  });
+
+  globalThis.process.on("unhandledRejection", (reason) => {
+    console.error(`Unhandled promise rejection: ${redactTokens(reason?.stack || reason)}`);
+    globalThis.process.exit(1);
+  });
+}
+
 if (isDirectRun()) {
   main().catch((error) => {
-    console.error(`Fatal error starting MCP Server for Wave: ${error?.message ?? error}`);
+    console.error(`Fatal error starting MCP Server for Wave: ${redactTokens(error?.message ?? error)}`);
     globalThis.process.exit(1);
   });
 }

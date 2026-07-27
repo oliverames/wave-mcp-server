@@ -380,7 +380,7 @@ scripts/
   check-release-consistency  Fail the build when anything disagrees
   build-mcpb.mjs             Desktop bundle
 worker/                      Hosted OAuth connector
-test/unit.test.mjs           57 tests, no network
+test/unit.test.mjs           58 tests, no network
 ```
 
 The tool layer lives in one file on purpose. It is imported unchanged by the
@@ -399,7 +399,7 @@ at all, which catches a field Wave renames before a user does.
 
 ```bash
 npm install
-npm test                  # 57 unit tests, no network
+npm test                  # 58 unit tests, no network
 npm run smoke:list-tools  # start over stdio, enumerate tools
 npm run smoke:packed      # pack, install, and launch via the bin symlink
 npm run smoke:schema      # validate every query against live Wave

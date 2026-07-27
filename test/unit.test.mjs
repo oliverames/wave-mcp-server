@@ -443,3 +443,13 @@ test("WAVE_MCP_NO_AUTOSTART suppresses autostart outright", (t) => {
   process.env.WAVE_MCP_NO_AUTOSTART = "1";
   assert.equal(__testables.isDirectRun(), false);
 });
+
+test("token-shaped strings are redacted before reaching stderr", () => {
+  // sanitizeErrorMessage lives inside the factory; the process-level crash
+  // handlers need their own redactor, and a stack trace can carry a header.
+  const redacted = __testables.redactTokens(
+    "Error at fetch\n  Authorization: Bearer sk-live-abc123def456\n  at waveFetch"
+  );
+  assert.ok(!redacted.includes("sk-live-abc123def456"));
+  assert.match(redacted, /REDACTED_TOKEN/);
+});
