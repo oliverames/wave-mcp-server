@@ -126,8 +126,8 @@ export function deletePage(csrf) {
 <h1>Delete a connection</h1>
 <p>This removes the stored Wave tokens for one user. Your accounting data in
 Wave is untouched.</p>
-<p class="muted">Your Wave user ID is shown by the <code>wave_auth_status</code>
-tool in any connected client.</p>
+<p class="muted">Your Wave user ID is the <code>id</code> field returned by the
+<code>wave_get_user</code> tool in any connected client.</p>
 <form method="post" action="/delete">
   <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
   <p><input type="text" name="wave_user_id" placeholder="Wave user ID" required></p>

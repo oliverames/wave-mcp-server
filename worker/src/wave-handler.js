@@ -56,12 +56,27 @@ app.get("/health", (c) => c.json({ status: "ok" }));
  * is about to happen and let them choose whether the connection may write.
  */
 app.get("/authorize", async (c) => {
-  const oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
-  if (!oauthRequest.clientId) {
-    return c.html(layout("Invalid request", messagePage("Invalid request", "This authorization request is missing a client id.")), 400);
+  // parseAuthRequest throws on a malformed request -- a plain or missing PKCE
+  // challenge, an unknown client -- and an uncaught throw surfaces as a bare
+  // 500. The refusal is right either way; answer with a page and a 400.
+  let oauthRequest;
+  let client;
+  try {
+    oauthRequest = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    if (!oauthRequest.clientId) throw new Error("missing client id");
+    client = await c.env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
+  } catch {
+    return c.html(
+      layout(
+        "Invalid request",
+        messagePage(
+          "Invalid request",
+          "This authorization request is malformed or references an unknown client. Start again from your MCP client; note that PKCE with S256 is required."
+        )
+      ),
+      400
+    );
   }
-
-  const client = await c.env.OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
   // Sign the request so the POST cannot be forged or tampered with between
   // the two steps.
   const payload = btoa(JSON.stringify(oauthRequest));

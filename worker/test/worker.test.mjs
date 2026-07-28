@@ -244,3 +244,39 @@ test("message pages escape both title and body", () => {
 test("the layout marks pages noindex", () => {
   assert.match(layout("t", "<p>b</p>"), /name="robots" content="noindex"/);
 });
+
+// --- Authorize error shape --------------------------------------------------
+
+import { WaveHandler } from "../src/wave-handler.js";
+
+test("a malformed authorize request gets a 400 page, not a bare 500", async () => {
+  const badProviderEnv = {
+    ...env,
+    OAUTH_PROVIDER: {
+      parseAuthRequest: async () => {
+        throw new Error("The code_challenge_method must be S256");
+      },
+      lookupClient: async () => null,
+    },
+  };
+  const response = await WaveHandler.fetch(
+    new Request("https://wave.amesvt.com/authorize?client_id=x&code_challenge_method=plain"),
+    badProviderEnv
+  );
+  assert.equal(response.status, 400);
+  const body = await response.text();
+  assert.match(body, /Invalid request/);
+  assert.ok(!body.includes("Internal Server Error"));
+});
+
+test("an authorize request with no client id gets the same 400 page", async () => {
+  const providerEnv = {
+    ...env,
+    OAUTH_PROVIDER: {
+      parseAuthRequest: async () => ({}),
+      lookupClient: async () => null,
+    },
+  };
+  const response = await WaveHandler.fetch(new Request("https://wave.amesvt.com/authorize"), providerEnv);
+  assert.equal(response.status, 400);
+});
