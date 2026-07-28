@@ -51,6 +51,34 @@ export function scopesFor({ writesEnabled }) {
   return writesEnabled ? [...READ_SCOPES, ...WRITE_SCOPES] : READ_SCOPES;
 }
 
+/**
+ * Wave accounts permitted to hold a connection, from ALLOWED_WAVE_USERS.
+ *
+ * The deployment at wave.amesvt.com serves one person, so anyone else who
+ * reaches the endpoint has to be turned away before a token is stored.
+ * Entries are Wave user ids or account emails, comma or whitespace separated.
+ * An empty list means no restriction, which is what someone self-hosting
+ * their own copy of this connector wants.
+ */
+export function allowedWaveUsers(env) {
+  return new Set(
+    String(env.ALLOWED_WAVE_USERS ?? "")
+      .split(/[,\s]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export function isAllowedWaveUser(env, user) {
+  const allowed = allowedWaveUsers(env);
+  if (allowed.size === 0) return true;
+  // Wave's user query calls it defaultEmail; the connector token props carry
+  // it as email. Accept either, so both call sites can pass what they have.
+  return [user?.id, user?.email, user?.defaultEmail].some(
+    (value) => value && allowed.has(String(value).toLowerCase())
+  );
+}
+
 export function tokenRecordKey(waveUserId) {
   return `wave:token:${waveUserId}`;
 }

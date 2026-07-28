@@ -11,3 +11,8 @@ WAVE_CLIENT_SECRET=your_wave_oauth_client_secret
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 COOKIE_ENCRYPTION_KEY=replace_with_random_32_byte_key
 DATA_ENCRYPTION_KEY=replace_with_a_different_random_32_byte_key
+
+# Wave accounts allowed to connect, as user ids or account emails, comma
+# separated. Production sets this in wrangler.jsonc. Leave it empty here to
+# accept whichever account you test with locally.
+ALLOWED_WAVE_USERS=

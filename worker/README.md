@@ -31,17 +31,18 @@ Client → OAuthProvider ──┬─ /mcp, /sse   → WaveMCP (Durable Object p
 
 ## Status
 
-Deployed at **https://wave.amesvt.com**. The infrastructure is live and the
-transport is hardened, but the connector cannot complete a connection until a
-Wave OAuth application exists and its two secrets are set (step 1 and step 3
-below). Until then `/authorize` will fail at the redirect to Wave.
+Deployed at **https://wave.amesvt.com** and fully configured.
 
 | Piece | State |
 |-------|-------|
 | Worker deployed, custom domain, DNS | done |
 | KV namespace (`WAVE_OAUTH_KV`) | done |
 | `COOKIE_ENCRYPTION_KEY`, `DATA_ENCRYPTION_KEY` | done |
-| `WAVE_CLIENT_ID`, `WAVE_CLIENT_SECRET` | **needed** |
+| `WAVE_CLIENT_ID`, `WAVE_CLIENT_SECRET` | done |
+
+This deployment is private: `ALLOWED_WAVE_USERS` in `wrangler.jsonc` restricts
+it to a single Wave account. A copy self-hosted by someone else should set that
+variable to their own account, or leave it empty to accept any account.
 
 ## Setup
 
@@ -60,15 +61,14 @@ below). Until then `/authorize` will fail at the redirect to Wave.
    npx wrangler kv namespace create WAVE_OAUTH_KV
    ```
 
-3. **Set the secrets.** Never put these in `wrangler.jsonc`. The two
-   encryption keys are already set on this deployment; the two Wave ones are
-   not, because they come from the application in step 1:
+3. **Set the secrets.** Never put these in `wrangler.jsonc`. All four are set
+   on this deployment; the two Wave ones come from the application in step 1:
 
    ```bash
-   npx wrangler secret put WAVE_CLIENT_ID       # still needed
-   npx wrangler secret put WAVE_CLIENT_SECRET   # still needed
-   npx wrangler secret put COOKIE_ENCRYPTION_KEY  # done
-   npx wrangler secret put DATA_ENCRYPTION_KEY    # done
+   npx wrangler secret put WAVE_CLIENT_ID
+   npx wrangler secret put WAVE_CLIENT_SECRET
+   npx wrangler secret put COOKIE_ENCRYPTION_KEY
+   npx wrangler secret put DATA_ENCRYPTION_KEY
    ```
 
    The two keys must be independent random values of 32 bytes or more:
@@ -97,6 +97,11 @@ npm test
 
 ## Security model
 
+- **Connections are restricted to an owner allowlist.** `ALLOWED_WAVE_USERS`
+  names the Wave accounts that may connect. A stranger who authorizes at Wave
+  is refused at `/callback` before any token is written, and the check runs
+  again on every MCP session, so tightening the list cuts off grants that
+  already exist.
 - **Tokens are encrypted at the application layer** before they reach KV, with
   the storage key bound in as additional authenticated data. A record copied to
   another user's key will not decrypt.

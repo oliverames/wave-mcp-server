@@ -359,10 +359,14 @@ the live schema.
 
 ## Hosted Connector
 
-A Cloudflare Worker serves the same tools at **https://wave.amesvt.com/mcp**,
-with per-user OAuth instead of a shared token. Users authorize against their own
-Wave account, tokens are encrypted before storage, and write access is chosen
-at authorization time so a read-only connection cannot be escalated later.
+A Cloudflare Worker serves the same tools over OAuth instead of a shared token.
+Users authorize against their own Wave account, tokens are encrypted before
+storage, and write access is chosen at authorization time so a read-only
+connection cannot be escalated later.
+
+The deployment at **https://wave.amesvt.com/mcp** is private: an owner
+allowlist restricts it to one Wave account, and any other account is refused
+before a token is stored. Deploy your own copy from `worker/` to use it.
 
 See [worker/README.md](worker/README.md) for setup and the security model.
 

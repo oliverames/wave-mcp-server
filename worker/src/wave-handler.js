@@ -12,6 +12,7 @@ import {
   buildWaveAuthorizeUrl,
   exchangeCodeForTokens,
   fetchWaveUser,
+  isAllowedWaveUser,
   hmacSign,
   hmacVerify,
   randomToken,
@@ -133,6 +134,21 @@ app.get("/callback", async (c) => {
     return c.html(layout("Connection failed", messagePage("Connection failed", failure.message)), 502);
   }
 
+  // Turn away any account other than the connector's owner before the tokens
+  // are written, so an unauthorized grant never exists to be revoked later.
+  if (!isAllowedWaveUser(c.env, user)) {
+    return c.html(
+      layout(
+        "Not authorized",
+        messagePage(
+          "Not authorized",
+          "This connector is private and serves a single Wave account. Nothing was stored, and the authorization Wave just granted can be revoked from your Wave account settings."
+        )
+      ),
+      403
+    );
+  }
+
   await saveTokenRecord(
     c.env.OAUTH_KV,
     user.id,
@@ -147,7 +163,10 @@ app.get("/callback", async (c) => {
     userId: user.id,
     metadata: { label: user.defaultEmail ?? user.id },
     scope: stored.oauthRequest.scope,
-    props: { waveUserId: user.id, writesEnabled: stored.writesEnabled },
+    // The email rides along so the allowlist can be re-checked on every MCP
+    // request: tightening ALLOWED_WAVE_USERS then cuts off existing grants
+    // rather than only blocking new ones.
+    props: { waveUserId: user.id, waveEmail: user.defaultEmail ?? null, writesEnabled: stored.writesEnabled },
   });
 
   return Response.redirect(redirectTo, 302);

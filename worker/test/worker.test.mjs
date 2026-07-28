@@ -23,6 +23,7 @@ import {
   WRITE_SCOPES,
   buildWaveAuthorizeUrl,
   base64url,
+  isAllowedWaveUser,
 } from "../src/wave-oauth.js";
 import { layout, messagePage, consentPage } from "../src/pages.js";
 
@@ -184,6 +185,42 @@ test("the authorize URL carries the client, redirect, state, and scopes", () => 
 test("base64url output is URL-safe and unpadded", () => {
   const encoded = base64url(new Uint8Array([251, 255, 190, 0]));
   assert.ok(!/[+/=]/.test(encoded), encoded);
+});
+
+// --- Owner allowlist --------------------------------------------------------
+
+const ownerEnv = { ...env, ALLOWED_WAVE_USERS: "owner@example.com" };
+
+test("the owner is allowed by account email, case-insensitively", () => {
+  assert.equal(isAllowedWaveUser(ownerEnv, { id: "u:1", defaultEmail: "Owner@Example.COM" }), true);
+});
+
+test("the owner is allowed by the email carried in connector token props", () => {
+  assert.equal(isAllowedWaveUser(ownerEnv, { id: "u:1", email: "owner@example.com" }), true);
+});
+
+test("a Wave user id can be allowlisted directly", () => {
+  assert.equal(isAllowedWaveUser({ ...env, ALLOWED_WAVE_USERS: "u:abc" }, { id: "u:abc" }), true);
+});
+
+test("any other Wave account is refused", () => {
+  assert.equal(isAllowedWaveUser(ownerEnv, { id: "u:2", defaultEmail: "stranger@example.com" }), false);
+});
+
+test("a user with no email is refused when the list holds only emails", () => {
+  assert.equal(isAllowedWaveUser(ownerEnv, { id: "u:3", defaultEmail: null }), false);
+});
+
+test("multiple entries are accepted comma or whitespace separated", () => {
+  const multi = { ...env, ALLOWED_WAVE_USERS: "a@example.com, b@example.com\nu:9" };
+  assert.equal(isAllowedWaveUser(multi, { id: "u:9" }), true);
+  assert.equal(isAllowedWaveUser(multi, { id: "x", defaultEmail: "b@example.com" }), true);
+  assert.equal(isAllowedWaveUser(multi, { id: "x", defaultEmail: "c@example.com" }), false);
+});
+
+test("an unset or empty list leaves a self-hosted copy unrestricted", () => {
+  assert.equal(isAllowedWaveUser(env, { id: "anyone", defaultEmail: "anyone@example.com" }), true);
+  assert.equal(isAllowedWaveUser({ ...env, ALLOWED_WAVE_USERS: "  , " }, { id: "anyone" }), true);
 });
 
 // --- HTML escaping ----------------------------------------------------------

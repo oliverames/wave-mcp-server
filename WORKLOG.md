@@ -3,6 +3,41 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-27 - Finished the hosted connector's OAuth setup and made it private
+
+**What changed**: the Wave developer-portal application now exists, its two
+secrets are set on the Worker, and the connector is restricted to a single Wave
+account.
+
+**The failure**: connecting produced `invalid_request` / "Invalid client_id
+parameter value" from Wave's authorize endpoint. `WAVE_CLIENT_ID` and
+`WAVE_CLIENT_SECRET` had never been set, so `buildWaveAuthorizeUrl` serialized
+`client_id=undefined` and Wave rejected it before the consent screen. Nothing
+in the Worker was wrong; the deployment was simply incomplete, which the
+previous session's handoff had recorded as an open item. Credentials now live
+in 1Password (`op://Development/Wave MCP Connector`) and were piped into
+`wrangler secret put` from there, never through a file or a shell history line.
+
+**Scopes were the other unknown.** The ten read scopes in `wave-oauth.js` were
+a docs reading that had never been exercised. Wave accepted all ten on the live
+authorize URL, so the guess was right.
+
+**Owner allowlist**: a hosted connector answers to anyone who learns its URL,
+and this one is meant for one person. `ALLOWED_WAVE_USERS` matches a Wave user
+id or account email; anyone else is refused at `/callback` before a token is
+written, so an unauthorized grant never exists to be cleaned up. The check runs
+again in `WaveMCP.init()` on every session, which means removing an entry ends
+a live connection rather than only blocking new ones. That is why the account
+email rides along in the connector token props.
+
+The value is set as a Worker secret rather than a `wrangler.jsonc` var. It is
+not a secret cryptographically, but it is an owner's address and this
+repository is public. An empty or unset list means no restriction, which is
+what someone self-hosting their own copy wants.
+
+**Still not done**: no mutation has run against a live Wave account, and
+`evaluation/evaluation.xml` still carries placeholder answers.
+
 ## 2026-07-27 - Published 1.0.0 to npm and deployed the hosted connector
 
 **What changed**: `@oliverames/mcp-server-for-wave@1.0.0` is on npm, and the

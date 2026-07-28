@@ -46,4 +46,12 @@
   //   WAVE_CLIENT_SECRET      - Wave OAuth application secret
   //   COOKIE_ENCRYPTION_KEY   - random 32+ byte key for consent/state HMACs
   //   DATA_ENCRYPTION_KEY     - separate random 32+ byte key for Wave tokens
+  //   ALLOWED_WAVE_USERS      - Wave accounts, as user ids or account emails,
+  //                             permitted to connect. Not secret in the
+  //                             cryptographic sense, but it is an owner's
+  //                             address and this repository is public, so it
+  //                             is set out of band rather than committed.
+  //                             This deployment allows one account; unset
+  //                             means no restriction, which is what a
+  //                             self-hosted copy usually wants.
 }

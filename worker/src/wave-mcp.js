@@ -7,11 +7,18 @@
 import { McpAgent } from "agents/mcp";
 import { createWaveServer } from "../../index.js";
 import { REMOTE_SERVER_INFO } from "./brand-assets.js";
-import { getFreshAccessToken } from "./wave-oauth.js";
+import { getFreshAccessToken, isAllowedWaveUser } from "./wave-oauth.js";
 
 export class WaveMCP extends McpAgent {
   async init() {
-    const { waveUserId, writesEnabled } = this.props;
+    const { waveUserId, waveEmail, writesEnabled } = this.props;
+
+    // Re-check the owner allowlist per session, not just at grant time, so a
+    // token issued before the list was tightened stops working.
+    if (!isAllowedWaveUser(this.env, { id: waveUserId, email: waveEmail })) {
+      throw new Error("This Wave account is not authorized to use this connector.");
+    }
+
     const { server } = createWaveServer({
       // Called per outbound Wave request, so an expiring token is refreshed
       // mid-session rather than failing the call.

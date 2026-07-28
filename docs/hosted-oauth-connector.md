@@ -24,6 +24,19 @@ server is simpler and has a smaller surface. The hosted connector earns its
 complexity when more than one person needs access, or when your client cannot
 launch a subprocess.
 
+## Who may connect
+
+A hosted connector is reachable by anyone who learns its URL, so it carries an
+owner allowlist. `ALLOWED_WAVE_USERS` names the Wave accounts, by user id or
+account email, permitted to hold a connection. Anyone else who authorizes at
+Wave is refused at `/callback` before a token is stored, and the check runs
+again on every MCP session, so removing an entry ends a connection that already
+exists rather than only blocking new ones.
+
+The deployment at `wave.amesvt.com` is private and allows a single account. A
+copy you self-host should name your own account, or leave the variable empty to
+accept any Wave account.
+
 ## Access levels
 
 Write access is chosen during authorization, not afterwards. A read-only
