@@ -11,7 +11,7 @@ import { getFreshAccessToken, isAllowedWaveUser } from "./wave-oauth.js";
 
 export class WaveMCP extends McpAgent {
   async init() {
-    const { waveUserId, waveEmail, writesEnabled } = this.props;
+    const { waveUserId, waveEmail, writesEnabled, tokenKey } = this.props;
 
     // Re-check the owner allowlist per session, not just at grant time, so a
     // token issued before the list was tightened stops working.
@@ -22,7 +22,7 @@ export class WaveMCP extends McpAgent {
     const { server } = createWaveServer({
       // Called per outbound Wave request, so an expiring token is refreshed
       // mid-session rather than failing the call.
-      getAccessToken: () => getFreshAccessToken(this.env, waveUserId),
+      getAccessToken: () => getFreshAccessToken(this.env, waveUserId, tokenKey),
       hasCredentials: true,
       writesEnabled: !!writesEnabled,
       runtime: {

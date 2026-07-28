@@ -35,16 +35,20 @@ export const READ_SCOPES = [
   "transaction:read",
 ];
 
+// Verified against the live authorize endpoint 2026-07-27: Wave's write
+// scopes are resource:write, not resource:create. The :create guesses passed
+// the logged-out endpoint's shallow validation but failed the real check that
+// runs on an authenticated session, as error=invalid_scope at the callback.
 export const WRITE_SCOPES = [
-  "account:create",
-  "customer:create",
-  "product:create",
-  "sales_tax:create",
-  "invoice:create",
+  "account:write",
+  "customer:write",
+  "product:write",
+  "sales_tax:write",
+  "invoice:write",
   "invoice:send",
-  "estimate:create",
+  "estimate:write",
   "estimate:send",
-  "transaction:create",
+  "transaction:write",
 ];
 
 export function scopesFor({ writesEnabled }) {
@@ -79,8 +83,17 @@ export function isAllowedWaveUser(env, user) {
   );
 }
 
-export function tokenRecordKey(waveUserId) {
-  return `wave:token:${waveUserId}`;
+/**
+ * Storage key for one connection's Wave tokens.
+ *
+ * Keyed per grant, not per Wave user: several MCP clients can hold
+ * connections at once, each authorized with its own scope set, and one
+ * connection reauthorizing or being deleted must not disturb the others.
+ * The tokenKey is a random value minted at the callback and carried in the
+ * grant props, so only the session that owns the grant can name its record.
+ */
+export function tokenRecordKey(waveUserId, tokenKey) {
+  return `wave:token:${waveUserId}:${tokenKey}`;
 }
 
 export function randomToken(bytes = 32) {
@@ -246,20 +259,35 @@ export function toTokenRecord(tokens, { writesEnabled }) {
   };
 }
 
-export async function saveTokenRecord(kv, waveUserId, record, encryptionSecret) {
-  const key = tokenRecordKey(waveUserId);
+export async function saveTokenRecord(kv, waveUserId, tokenKey, record, encryptionSecret) {
+  const key = tokenRecordKey(waveUserId, tokenKey);
   await kv.put(key, await encryptStoredJson(encryptionSecret, key, record));
 }
 
-export async function readTokenRecord(kv, waveUserId, encryptionSecret) {
-  const key = tokenRecordKey(waveUserId);
+export async function readTokenRecord(kv, waveUserId, tokenKey, encryptionSecret) {
+  const key = tokenRecordKey(waveUserId, tokenKey);
   const raw = await kv.get(key);
   if (!raw) return null;
   return decryptStoredJson(encryptionSecret, key, raw);
 }
 
-export async function deleteTokenRecord(kv, waveUserId) {
-  await kv.delete(tokenRecordKey(waveUserId));
+/**
+ * Remove every stored Wave token for a user, across all their connections.
+ * The public delete page works user-wide: someone revoking access should not
+ * have to know how many clients they had connected.
+ */
+export async function deleteAllTokenRecords(kv, waveUserId) {
+  let deleted = 0;
+  let cursor;
+  do {
+    const page = await kv.list({ prefix: `wave:token:${waveUserId}`, cursor });
+    for (const entry of page.keys) {
+      await kv.delete(entry.name);
+      deleted += 1;
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return deleted;
 }
 
 /**
@@ -268,8 +296,8 @@ export async function deleteTokenRecord(kv, waveUserId) {
  * Wave rotates the refresh token on each refresh, so the new one has to be
  * persisted or the next refresh fails.
  */
-export async function getFreshAccessToken(env, waveUserId) {
-  const record = await readTokenRecord(env.OAUTH_KV, waveUserId, env.DATA_ENCRYPTION_KEY);
+export async function getFreshAccessToken(env, waveUserId, tokenKey) {
+  const record = await readTokenRecord(env.OAUTH_KV, waveUserId, tokenKey, env.DATA_ENCRYPTION_KEY);
   if (!record) {
     throw new Error("This Wave connection is no longer authorized. Reconnect the connector and try again.");
   }
@@ -288,6 +316,6 @@ export async function getFreshAccessToken(env, waveUserId) {
     // Wave may omit a new refresh token; keep the existing one if so.
     refresh_token: refreshed.refresh_token ?? record.refresh_token,
   };
-  await saveTokenRecord(env.OAUTH_KV, waveUserId, updated, env.DATA_ENCRYPTION_KEY);
+  await saveTokenRecord(env.OAUTH_KV, waveUserId, tokenKey, updated, env.DATA_ENCRYPTION_KEY);
   return updated.access_token;
 }

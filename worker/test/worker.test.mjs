@@ -280,3 +280,54 @@ test("an authorize request with no client id gets the same 400 page", async () =
   const response = await WaveHandler.fetch(new Request("https://wave.amesvt.com/authorize"), providerEnv);
   assert.equal(response.status, 400);
 });
+
+// --- Scope names and per-connection token records ----------------------------
+
+import { tokenRecordKey, deleteAllTokenRecords } from "../src/wave-oauth.js";
+
+test("write scopes use Wave's :write naming, never the rejected :create", () => {
+  for (const scope of WRITE_SCOPES) {
+    assert.ok(!scope.endsWith(":create"), `${scope} uses :create, which Wave rejects as invalid_scope`);
+  }
+  const expected = new Set([
+    "account:write",
+    "customer:write",
+    "product:write",
+    "sales_tax:write",
+    "invoice:write",
+    "invoice:send",
+    "estimate:write",
+    "estimate:send",
+    "transaction:write",
+  ]);
+  assert.deepEqual(new Set(WRITE_SCOPES), expected);
+});
+
+test("token records are keyed per connection, not per user", () => {
+  const a = tokenRecordKey("user-1", "key-a");
+  const b = tokenRecordKey("user-1", "key-b");
+  assert.notEqual(a, b);
+  assert.ok(a.startsWith("wave:token:user-1:"));
+});
+
+test("deleteAllTokenRecords removes every connection for one user only", async () => {
+  const store = new Map([
+    ["wave:token:user-1:key-a", "x"],
+    ["wave:token:user-1:key-b", "x"],
+    ["wave:token:user-2:key-c", "x"],
+  ]);
+  const kv = {
+    async list({ prefix }) {
+      return {
+        keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })),
+        list_complete: true,
+      };
+    },
+    async delete(name) {
+      store.delete(name);
+    },
+  };
+  const deleted = await deleteAllTokenRecords(kv, "user-1");
+  assert.equal(deleted, 2);
+  assert.ok(store.has("wave:token:user-2:key-c"), "another user's record was deleted");
+});

@@ -19,7 +19,7 @@ import {
   saveTokenRecord,
   scopesFor,
   toTokenRecord,
-  deleteTokenRecord,
+  deleteAllTokenRecords,
 } from "./wave-oauth.js";
 import { layout, landingPage, consentPage, privacyPage, deletePage, messagePage } from "./pages.js";
 
@@ -164,9 +164,15 @@ app.get("/callback", async (c) => {
     );
   }
 
+  // A fresh key per authorization keeps this connection's Wave tokens apart
+  // from every other client the same user has connected: a read-only
+  // authorization from one agent must not downgrade the token a write-enabled
+  // agent is using.
+  const tokenKey = randomToken(16);
   await saveTokenRecord(
     c.env.OAUTH_KV,
     user.id,
+    tokenKey,
     toTokenRecord(tokens, { writesEnabled: stored.writesEnabled }),
     c.env.DATA_ENCRYPTION_KEY
   );
@@ -181,7 +187,7 @@ app.get("/callback", async (c) => {
     // The email rides along so the allowlist can be re-checked on every MCP
     // request: tightening ALLOWED_WAVE_USERS then cuts off existing grants
     // rather than only blocking new ones.
-    props: { waveUserId: user.id, waveEmail: user.defaultEmail ?? null, writesEnabled: stored.writesEnabled },
+    props: { waveUserId: user.id, waveEmail: user.defaultEmail ?? null, writesEnabled: stored.writesEnabled, tokenKey },
   });
 
   return Response.redirect(redirectTo, 302);
@@ -211,13 +217,13 @@ app.post("/delete", async (c) => {
     return c.html(layout("Delete connection", messagePage("Nothing to delete", "Enter the Wave user ID shown by the wave_auth_status tool.")), 400);
   }
 
-  await deleteTokenRecord(c.env.OAUTH_KV, waveUserId);
+  const deleted = await deleteAllTokenRecords(c.env.OAUTH_KV, waveUserId);
   return c.html(
     layout(
       "Deleted",
       messagePage(
         "Connection deleted",
-        "The stored Wave tokens for that user were removed. Revoke the application in your Wave account settings as well if you want to be certain."
+        `Removed the stored Wave tokens for ${deleted} connection(s). Revoke the application in your Wave account settings as well if you want to be certain.`
       )
     )
   );

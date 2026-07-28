@@ -3,6 +3,30 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-27 - Write scopes corrected, tokens stored per connection
+
+**invalid_scope on a write-enabled connection.** The earlier entry below says
+the scope guesses "were right" -- that was overclaimed. Only the read set had
+been proven; the write set used `resource:create` names, and Wave rejects
+those with `error=invalid_scope`. The trap: Wave's authorize endpoint
+validates scopes only on an *authenticated* session. Logged-out probes 302 to
+the login page having accepted any scope string, so every curl check passed
+while the real flow failed. Bisected in a logged-in browser: Wave's write
+scopes are `resource:write` (plus the real `invoice:send` and
+`estimate:send`). Verified end to end with a write-enabled authorization:
+Wave's consent screen renders the write set as "View and manage ...", and the
+resulting session registers all 74 tools. No mutation was run.
+
+**Wave tokens are now stored per connection, not per user.** The old key
+`wave:token:<userId>` meant every authorization overwrote the last one's Wave
+tokens: connect a read-only agent after a write-enabled one and the shared
+token silently downgrades, breaking the write agent at Wave. Records now live
+at `wave:token:<userId>:<tokenKey>`, with the random tokenKey carried in the
+grant props, so any number of agents can hold simultaneous connections with
+different access levels. The public /delete page removes all of a user's
+records by prefix, since someone revoking should not need to know how many
+clients they had connected.
+
 ## 2026-07-27 - Finished the hosted connector's OAuth setup and made it private
 
 **What changed**: the Wave developer-portal application now exists, its two
