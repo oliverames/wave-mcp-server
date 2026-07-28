@@ -29,7 +29,7 @@ import { z } from "zod";
 // import-time config resolution and the stdio autostart are both skipped.
 const IS_CLOUDFLARE_WORKERS = globalThis.navigator?.userAgent === "Cloudflare-Workers";
 
-const SERVER_VERSION = "1.0.1";
+const SERVER_VERSION = "1.0.2";
 const WAVE_ENDPOINT = "https://gql.waveapps.com/graphql/public";
 const WAVE_API_HOST = "gql.waveapps.com";
 const MAX_TOKEN_FILE_BYTES = 4096;
