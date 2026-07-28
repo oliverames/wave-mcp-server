@@ -3,6 +3,34 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-27 - 1.0.2 released; the version script was silently dropping index.js
+
+**What changed**: `@oliverames/mcp-server-for-wave@1.0.2` is on npm via the
+tag-triggered release workflow, and the Worker was redeployed so the hosted
+`serverInfo` reports the same version.
+
+**The v1.0.1 release failed by design.** The workflow's consistency gate
+refused to publish: `SERVER_VERSION` in `index.js` still read 1.0.0.
+`sync-plugin-metadata.mjs` rewrites that constant, but the package.json
+`version` script's `git add` list never included `index.js`, so every bump
+committed the manifests and left the constant behind. The gate rerunning all
+checks on the tag -- built on the day-one lesson that a tag can be pushed
+without a passing CI run -- is the only reason an inconsistent package never
+reached npm. `index.js` now leads the staged list.
+
+**Tag hygiene**: v1.0.1 stays where it is, a dead tag on the failed commit.
+Nothing was published under it, and re-pointing a pushed tag is worse than
+skipping a patch number. 1.0.2 went out clean: all release gates green,
+verified post-publish with a real `npx` handshake from an empty directory
+(serverInfo 1.0.2, registry dist-tag latest=1.0.2).
+
+**Left off at**: hosted connector fully working end to end. Read and write
+authorization paths both verified live. Remaining known gaps: no mutation has
+run against live Wave data, and `evaluation/evaluation.xml` still carries
+placeholder answers.
+
+---
+
 ## 2026-07-27 - Write scopes corrected, tokens stored per connection
 
 **invalid_scope on a write-enabled connection.** The earlier entry below says

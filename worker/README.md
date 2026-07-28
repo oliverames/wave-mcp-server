@@ -39,10 +39,12 @@ Deployed at **https://wave.amesvt.com** and fully configured.
 | KV namespace (`WAVE_OAUTH_KV`) | done |
 | `COOKIE_ENCRYPTION_KEY`, `DATA_ENCRYPTION_KEY` | done |
 | `WAVE_CLIENT_ID`, `WAVE_CLIENT_SECRET` | done |
+| `ALLOWED_WAVE_USERS` | done |
 
-This deployment is private: `ALLOWED_WAVE_USERS` in `wrangler.jsonc` restricts
-it to a single Wave account. A copy self-hosted by someone else should set that
-variable to their own account, or leave it empty to accept any account.
+This deployment is private: the `ALLOWED_WAVE_USERS` secret restricts it to a
+single Wave account. It is set out of band rather than committed because this
+repository is public and the value is an owner's address. A self-hosted copy
+should set it to its own account, or leave it unset to accept any account.
 
 ## Setup
 
@@ -61,7 +63,7 @@ variable to their own account, or leave it empty to accept any account.
    npx wrangler kv namespace create WAVE_OAUTH_KV
    ```
 
-3. **Set the secrets.** Never put these in `wrangler.jsonc`. All four are set
+3. **Set the secrets.** Never put these in `wrangler.jsonc`. All five are set
    on this deployment; the two Wave ones come from the application in step 1:
 
    ```bash
@@ -69,6 +71,7 @@ variable to their own account, or leave it empty to accept any account.
    npx wrangler secret put WAVE_CLIENT_SECRET
    npx wrangler secret put COOKIE_ENCRYPTION_KEY
    npx wrangler secret put DATA_ENCRYPTION_KEY
+   npx wrangler secret put ALLOWED_WAVE_USERS   # optional owner allowlist
    ```
 
    The two keys must be independent random values of 32 bytes or more:
