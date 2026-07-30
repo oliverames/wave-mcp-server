@@ -45,11 +45,11 @@ import { layout, landingPage, consentPage, privacyPage, deletePage, messagePage 
 
 const app = new Hono();
 
-function iconAsset(c, body, contentType, sha256) {
+function iconAsset(c, body, contentType, sha256, cacheControl = "public, max-age=31536000, immutable") {
   const etag = `"sha256-${sha256}"`;
   const headers = {
     "Content-Type": contentType,
-    "Cache-Control": "public, max-age=31536000, immutable",
+    "Cache-Control": cacheControl,
     "Access-Control-Allow-Origin": "*",
     "Cross-Origin-Resource-Policy": "cross-origin",
     "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -93,7 +93,13 @@ const pngIcons = [
 for (const [path, body, sha256] of pngIcons) {
   app.get(path, (c) => iconAsset(c, body, "image/png", sha256));
 }
-app.get("/favicon.ico", (c) => iconAsset(c, CONNECTOR_FAVICON_ICO, "image/x-icon", CONNECTOR_FAVICON_ICO_SHA256));
+app.get("/favicon.ico", (c) => iconAsset(
+  c,
+  CONNECTOR_FAVICON_ICO,
+  "image/x-icon",
+  CONNECTOR_FAVICON_ICO_SHA256,
+  "public, max-age=0, must-revalidate"
+));
 
 app.get("/privacy", (c) => c.html(layout("Privacy", privacyPage())));
 

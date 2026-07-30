@@ -70,6 +70,12 @@ test("hosted connector advertises and serves explicit favicon sizes", async () =
     const response = await WaveHandler.request(`https://wave.amesvt.com${path}`, {}, env);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type") ?? "", new RegExp(`^${contentType}`));
+    assert.equal(
+      response.headers.get("cache-control"),
+      path === "/favicon.ico"
+        ? "public, max-age=0, must-revalidate"
+        : "public, max-age=31536000, immutable"
+    );
     const body = Buffer.from(await response.arrayBuffer());
     const digest = await crypto.subtle.digest("SHA-256", body);
     assert.equal(Buffer.from(digest).toString("hex"), expectedSha256);
