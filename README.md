@@ -361,10 +361,14 @@ the live schema.
 
 A Cloudflare Worker serves the same tools over OAuth instead of a shared token.
 
-The hosted connector publishes the Wave connector artwork as conventional ICO,
-Apple touch, and explicit 8-bit PNG favicons from 16 through 256 pixels. MCP
-initialization also advertises the versioned 256px URL for clients that support
-server icon metadata.
+The hosted connector publishes the Wave connector artwork as an SVG favicon, a
+conventional ICO, Apple touch, and explicit 8-bit PNG favicons from 16 through
+256 pixels. The page head advertises the SVG first with the ICO as its
+alternate, because icon resolvers take the first usable declaration; the
+remaining sizes stay served for other consumers. The ICO carries a single 32px
+frame, since a six-frame uncompressed ICO reached 370 KB and resolvers skipped
+it rather than decode it. MCP initialization also advertises the versioned
+256px URL for clients that support server icon metadata.
 Users authorize against their own Wave account, tokens are encrypted before
 storage, and write access is chosen at authorization time so a read-only
 connection cannot be escalated later.
