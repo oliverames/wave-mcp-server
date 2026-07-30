@@ -35,7 +35,9 @@ import {
   CONNECTOR_FAVICON_96_PNG_SHA256,
   CONNECTOR_FAVICON_128_PNG_SHA256,
   CONNECTOR_FAVICON_256_PNG_SHA256,
+  CONNECTOR_FAVICON_ICO,
   CONNECTOR_FAVICON_ICO_SHA256,
+  CONNECTOR_FAVICON_SVG_SHA256,
   REMOTE_SERVER_INFO,
 } from "../src/brand-assets.js";
 
@@ -65,6 +67,7 @@ test("hosted connector advertises and serves explicit favicon sizes", async () =
     ["/favicon-128x128.png", "image/png", CONNECTOR_FAVICON_128_PNG_SHA256],
     ["/assets/wave-icon-v1.png", "image/png", CONNECTOR_FAVICON_256_PNG_SHA256],
     ["/favicon.ico", "image/x-icon", CONNECTOR_FAVICON_ICO_SHA256],
+    ["/favicon.svg", "image/svg\\+xml", CONNECTOR_FAVICON_SVG_SHA256],
   ];
   for (const [path, contentType, expectedSha256] of assets) {
     const response = await WaveHandler.request(`https://wave.amesvt.com${path}`, {}, env);
@@ -72,7 +75,7 @@ test("hosted connector advertises and serves explicit favicon sizes", async () =
     assert.match(response.headers.get("content-type") ?? "", new RegExp(`^${contentType}`));
     assert.equal(
       response.headers.get("cache-control"),
-      path === "/favicon.ico"
+      path === "/favicon.ico" || path === "/favicon.svg"
         ? "public, max-age=0, must-revalidate"
         : "public, max-age=31536000, immutable"
     );
@@ -82,9 +85,24 @@ test("hosted connector advertises and serves explicit favicon sizes", async () =
   }
   const landing = await WaveHandler.request("https://wave.amesvt.com/", {}, env);
   const html = await landing.text();
-  for (const size of [16, 32, 48, 64, 96, 128]) {
+  // The SVG leads and a small ICO follows. Icon resolvers take the first usable
+  // declaration, so the head advertises only the small variants; the larger PNG
+  // routes above stay served for other consumers. See WORKLOG 2026-07-30.
+  assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+  assert.match(html, /<link rel="alternate icon" href="\/favicon\.ico" sizes="32x32">/);
+  for (const size of [16, 32]) {
     assert.match(html, new RegExp(`sizes="${size}x${size}" href="/favicon-${size}x${size}\\.png"`));
   }
+});
+
+test("favicon.ico stays small enough for icon resolvers", () => {
+  // A six-frame uncompressed ICO reached 370 KB, which resolvers skipped. The
+  // reference that does render in Claude, sosumi.ai, serves one 32x32 frame at
+  // 4,286 bytes. See WORKLOG 2026-07-30.
+  assert.ok(
+    CONNECTOR_FAVICON_ICO.length < 10_000,
+    `favicon.ico is ${CONNECTOR_FAVICON_ICO.length} bytes; keep it to a single 32x32 frame`,
+  );
 });
 
 // --- Origin gating ----------------------------------------------------------

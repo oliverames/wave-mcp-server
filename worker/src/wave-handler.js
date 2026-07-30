@@ -27,6 +27,8 @@ import {
   CONNECTOR_FAVICON_256_PNG_SHA256,
   CONNECTOR_FAVICON_ICO,
   CONNECTOR_FAVICON_ICO_SHA256,
+  CONNECTOR_FAVICON_SVG,
+  CONNECTOR_FAVICON_SVG_SHA256,
 } from "./brand-assets.js";
 import {
   buildWaveAuthorizeUrl,
@@ -93,6 +95,13 @@ const pngIcons = [
 for (const [path, body, sha256] of pngIcons) {
   app.get(path, (c) => iconAsset(c, body, "image/png", sha256));
 }
+app.get("/favicon.svg", (c) => iconAsset(
+  c,
+  CONNECTOR_FAVICON_SVG,
+  "image/svg+xml; charset=utf-8",
+  CONNECTOR_FAVICON_SVG_SHA256,
+  "public, max-age=0, must-revalidate"
+));
 app.get("/favicon.ico", (c) => iconAsset(
   c,
   CONNECTOR_FAVICON_ICO,

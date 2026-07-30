@@ -3,6 +3,48 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-30 - Found why Claude showed the wrong connector icon
+
+**Context**: Reverses the 2026-07-29 six-frame ICO experiment, which was a guess
+at TinyFish's shape rather than a diagnosis.
+
+**Root cause, measured**: The green icon Claude showed for this connector was
+never Wave's logo. It was `amesvt.com`'s own favicon, a green rounded square
+with a white ring, served from `assets.amesvt.com`. Every `*.amesvt.com`
+connector rendered that same mark. Claude resolves a connector icon at the
+registrable domain, and `https://amesvt.com/favicon.ico` returned the Cloudflare
+Pages SPA fallback with `HTTP 200` and `content-type: text/html`. A 200 ends the
+fallback chain, so the resolver parsed the landing page and took the
+cross-origin favicon declared there. The correct Wave artwork was being served
+at `/assets/wave-icon-v1.png` the whole time and was never fetched.
+
+**Also settled**: the six-frame ICO was not what made TinyFish work. TinyFish is
+on `tinyfish.io`, an apex domain, so it has no registrable-domain fallback to
+lose to. Matching its frame count only produced a 370 KB file.
+
+**What changed**: `/favicon.ico` dropped from six uncompressed frames
+(370,070 bytes) to a single 32x32 frame (4,286 bytes), matching sosumi.ai, whose
+connector icon does render in Claude. Added `/favicon.svg` and made it the
+leading `rel="icon"` with the ICO as `alternate icon`. The head now advertises
+four icon links instead of nine.
+
+**Decisions made**: Wave's icon is raster-only, so `/favicon.svg` wraps the 96px
+PNG in an SVG `<image>` rather than being true vector art. That keeps the
+correct logo available to resolvers that ask for SVG first, at 6,210 bytes.
+Flagged in the generator so nobody mistakes it for a real vector later. Kept the
+larger PNG routes served and only removed them from the head.
+
+**Verification**: 38 of 38 Worker tests pass, including a new bound that fails
+if `favicon.ico` grows past 10 KB. Not yet deployed.
+
+**Open questions**: Whether a correct same-origin icon on the subdomain stops
+the registrable-domain fallback, or whether Claude only ever resolves at the
+registrable domain. If the latter, no `*.amesvt.com` connector can carry
+distinct branding and separate domains are the remaining lever. The apex fix
+in `amesvt-website` and this change must both deploy before retesting.
+
+---
+
 ## 2026-07-29 - Match TinyFish favicon structure for Claude testing
 
 **What changed**: Expanded the hosted favicon from four to six ICO entries at 16, 32, 48, 64, 128, and 256 pixels. The favicon response now uses revalidation caching while retaining its ETag.
