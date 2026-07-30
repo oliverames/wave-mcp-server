@@ -35,13 +35,22 @@ Flagged in the generator so nobody mistakes it for a real vector later. Kept the
 larger PNG routes served and only removed them from the head.
 
 **Verification**: 38 of 38 Worker tests pass, including a new bound that fails
-if `favicon.ico` grows past 10 KB. Not yet deployed.
+if `favicon.ico` grows past 10 KB. Deployed as version
+`ddd6563e-cecb-441c-92b4-63ae1404682b`. The live `/favicon.ico` ETag is
+`sha256-131b1e2c6dc522dbdcbe5ffa409229ace04a26aec7dc456f06f1d019ec68c8b2`,
+matching the generated asset byte for byte. Compare ETags rather than `curl`
+byte counts when checking what is live; the ETag is the SHA-256 of the body.
 
-**Open questions**: Whether a correct same-origin icon on the subdomain stops
-the registrable-domain fallback, or whether Claude only ever resolves at the
-registrable domain. If the latter, no `*.amesvt.com` connector can carry
-distinct branding and separate domains are the remaining lever. The apex fix
-in `amesvt-website` and this change must both deploy before retesting.
+**Retested, negative**: with the apex fixed and `workspace.amesvt.com` serving
+a correct same-origin mark, Claude still renders the green amesvt icon after a
+full sign-out, disconnect and reconnect. A correct subdomain icon does not win.
+
+**Open questions**: Either Claude resolves a custom connector's icon only at
+the registrable domain, or it holds a server-side icon cache a client
+reconnect does not clear. The full analysis, the supporting evidence, and the
+decisive test that was deliberately not run live in ynab-mcp-server's WORKLOG
+under the same date. Oliver chose to wait and re-check rather than recolor the
+live apex favicon to settle it now.
 
 ---
 
