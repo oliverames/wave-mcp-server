@@ -3,6 +3,16 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-29 - Add hosted connector icon discovery
+
+**What changed**: Added reproducible Worker icon generation from the canonical `assets/icon.png`, including 8-bit PNGs at 16, 32, 48, 64, 96, 128, and 256 pixels, an Apple touch icon, and a multi-size ICO. The Worker now serves those assets with cache and cross-origin headers, advertises them from its public pages, and includes the versioned 256-pixel icon in MCP server metadata.
+
+**Verification**: All 37 Worker tests and all 58 root tests pass, the release consistency check and Wrangler dry run pass, and the live Cloudflare deployment serves the branded PNG routes while `/mcp` remains authentication-protected. Deployment version: `7c640c52-43ff-4ab7-9f72-7701a69bbae3`.
+
+**Left off at**: Commit `7f695e0` is on `main`; this worklog entry records the completed deployment.
+
+---
+
 ## 2026-07-27 - 1.0.2 released; the version script was silently dropping index.js
 
 **What changed**: `@oliverames/mcp-server-for-wave@1.0.2` is on npm via the
