@@ -7,7 +7,27 @@
  */
 
 import { Hono } from "hono";
-import { DISCLAIMER } from "./brand-assets.js";
+import {
+  DISCLAIMER,
+  CONNECTOR_APPLE_TOUCH_ICON_PNG,
+  CONNECTOR_APPLE_TOUCH_ICON_PNG_SHA256,
+  CONNECTOR_FAVICON_16_PNG,
+  CONNECTOR_FAVICON_16_PNG_SHA256,
+  CONNECTOR_FAVICON_32_PNG,
+  CONNECTOR_FAVICON_32_PNG_SHA256,
+  CONNECTOR_FAVICON_48_PNG,
+  CONNECTOR_FAVICON_48_PNG_SHA256,
+  CONNECTOR_FAVICON_64_PNG,
+  CONNECTOR_FAVICON_64_PNG_SHA256,
+  CONNECTOR_FAVICON_96_PNG,
+  CONNECTOR_FAVICON_96_PNG_SHA256,
+  CONNECTOR_FAVICON_128_PNG,
+  CONNECTOR_FAVICON_128_PNG_SHA256,
+  CONNECTOR_FAVICON_256_PNG,
+  CONNECTOR_FAVICON_256_PNG_SHA256,
+  CONNECTOR_FAVICON_ICO,
+  CONNECTOR_FAVICON_ICO_SHA256,
+} from "./brand-assets.js";
 import {
   buildWaveAuthorizeUrl,
   exchangeCodeForTokens,
@@ -24,6 +44,20 @@ import {
 import { layout, landingPage, consentPage, privacyPage, deletePage, messagePage } from "./pages.js";
 
 const app = new Hono();
+
+function iconAsset(c, body, contentType, sha256) {
+  const etag = `"sha256-${sha256}"`;
+  const headers = {
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "Access-Control-Allow-Origin": "*",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    ETag: etag,
+  };
+  if (c.req.header("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(body, { headers });
+}
 
 function stateStub(env, id) {
   return env.OAUTH_STATE.get(env.OAUTH_STATE.idFromName(id));
@@ -44,6 +78,22 @@ async function takeState(env, id) {
 }
 
 app.get("/", (c) => c.html(layout("Wave MCP connector", landingPage(c.env.CONNECTOR_BASE_URL))));
+
+const pngIcons = [
+  ["/favicon-16x16.png", CONNECTOR_FAVICON_16_PNG, CONNECTOR_FAVICON_16_PNG_SHA256],
+  ["/favicon-32x32.png", CONNECTOR_FAVICON_32_PNG, CONNECTOR_FAVICON_32_PNG_SHA256],
+  ["/favicon-48x48.png", CONNECTOR_FAVICON_48_PNG, CONNECTOR_FAVICON_48_PNG_SHA256],
+  ["/favicon-64x64.png", CONNECTOR_FAVICON_64_PNG, CONNECTOR_FAVICON_64_PNG_SHA256],
+  ["/favicon-96x96.png", CONNECTOR_FAVICON_96_PNG, CONNECTOR_FAVICON_96_PNG_SHA256],
+  ["/favicon-128x128.png", CONNECTOR_FAVICON_128_PNG, CONNECTOR_FAVICON_128_PNG_SHA256],
+  ["/favicon-256x256.png", CONNECTOR_FAVICON_256_PNG, CONNECTOR_FAVICON_256_PNG_SHA256],
+  ["/assets/wave-icon-v1.png", CONNECTOR_FAVICON_256_PNG, CONNECTOR_FAVICON_256_PNG_SHA256],
+  ["/apple-touch-icon.png", CONNECTOR_APPLE_TOUCH_ICON_PNG, CONNECTOR_APPLE_TOUCH_ICON_PNG_SHA256],
+];
+for (const [path, body, sha256] of pngIcons) {
+  app.get(path, (c) => iconAsset(c, body, "image/png", sha256));
+}
+app.get("/favicon.ico", (c) => iconAsset(c, CONNECTOR_FAVICON_ICO, "image/x-icon", CONNECTOR_FAVICON_ICO_SHA256));
 
 app.get("/privacy", (c) => c.html(layout("Privacy", privacyPage())));
 

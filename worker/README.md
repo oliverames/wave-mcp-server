@@ -145,3 +145,7 @@ Expect `401`, three headers, and `403`.
 ## Not affiliated with Wave
 
 An independent connector. Wave Financial Inc. owns the Wave name and marks.
+The hosted landing page and MCP initialization metadata advertise the canonical
+connector artwork through explicit 8-bit PNG favicons at 16, 32, 48, 64, 96,
+128, and 256 pixels, plus ICO and Apple touch variants. Regenerate them with
+`npm run build:worker-icons` after changing `assets/icon.png`.

@@ -360,6 +360,11 @@ the live schema.
 ## Hosted Connector
 
 A Cloudflare Worker serves the same tools over OAuth instead of a shared token.
+
+The hosted connector publishes the Wave connector artwork as conventional ICO,
+Apple touch, and explicit 8-bit PNG favicons from 16 through 256 pixels. MCP
+initialization also advertises the versioned 256px URL for clients that support
+server icon metadata.
 Users authorize against their own Wave account, tokens are encrypted before
 storage, and write access is chosen at authorization time so a read-only
 connection cannot be escalated later.

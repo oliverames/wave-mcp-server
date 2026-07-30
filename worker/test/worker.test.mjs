@@ -26,6 +26,18 @@ import {
   isAllowedWaveUser,
 } from "../src/wave-oauth.js";
 import { layout, messagePage, consentPage } from "../src/pages.js";
+import { WaveHandler } from "../src/wave-handler.js";
+import {
+  CONNECTOR_FAVICON_16_PNG_SHA256,
+  CONNECTOR_FAVICON_32_PNG_SHA256,
+  CONNECTOR_FAVICON_48_PNG_SHA256,
+  CONNECTOR_FAVICON_64_PNG_SHA256,
+  CONNECTOR_FAVICON_96_PNG_SHA256,
+  CONNECTOR_FAVICON_128_PNG_SHA256,
+  CONNECTOR_FAVICON_256_PNG_SHA256,
+  CONNECTOR_FAVICON_ICO_SHA256,
+  REMOTE_SERVER_INFO,
+} from "../src/brand-assets.js";
 
 const env = {
   CONNECTOR_BASE_URL: "https://wave.amesvt.com",
@@ -37,6 +49,37 @@ const env = {
 function request(url, headers = {}) {
   return new Request(url, { headers });
 }
+
+test("hosted connector advertises and serves explicit favicon sizes", async () => {
+  assert.deepEqual(REMOTE_SERVER_INFO.icons, [{
+    src: "https://wave.amesvt.com/assets/wave-icon-v1.png",
+    mimeType: "image/png",
+    sizes: ["256x256"],
+  }]);
+  const assets = [
+    ["/favicon-16x16.png", "image/png", CONNECTOR_FAVICON_16_PNG_SHA256],
+    ["/favicon-32x32.png", "image/png", CONNECTOR_FAVICON_32_PNG_SHA256],
+    ["/favicon-48x48.png", "image/png", CONNECTOR_FAVICON_48_PNG_SHA256],
+    ["/favicon-64x64.png", "image/png", CONNECTOR_FAVICON_64_PNG_SHA256],
+    ["/favicon-96x96.png", "image/png", CONNECTOR_FAVICON_96_PNG_SHA256],
+    ["/favicon-128x128.png", "image/png", CONNECTOR_FAVICON_128_PNG_SHA256],
+    ["/assets/wave-icon-v1.png", "image/png", CONNECTOR_FAVICON_256_PNG_SHA256],
+    ["/favicon.ico", "image/x-icon", CONNECTOR_FAVICON_ICO_SHA256],
+  ];
+  for (const [path, contentType, expectedSha256] of assets) {
+    const response = await WaveHandler.request(`https://wave.amesvt.com${path}`, {}, env);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", new RegExp(`^${contentType}`));
+    const body = Buffer.from(await response.arrayBuffer());
+    const digest = await crypto.subtle.digest("SHA-256", body);
+    assert.equal(Buffer.from(digest).toString("hex"), expectedSha256);
+  }
+  const landing = await WaveHandler.request("https://wave.amesvt.com/", {}, env);
+  const html = await landing.text();
+  for (const size of [16, 32, 48, 64, 96, 128]) {
+    assert.match(html, new RegExp(`sizes="${size}x${size}" href="/favicon-${size}x${size}\\.png"`));
+  }
+});
 
 // --- Origin gating ----------------------------------------------------------
 
@@ -246,8 +289,6 @@ test("the layout marks pages noindex", () => {
 });
 
 // --- Authorize error shape --------------------------------------------------
-
-import { WaveHandler } from "../src/wave-handler.js";
 
 test("a malformed authorize request gets a 400 page, not a bare 500", async () => {
   const badProviderEnv = {

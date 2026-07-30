@@ -1,11 +1,29 @@
 // Identity the hosted connector presents to MCP clients and OAuth metadata.
 
+import {
+  CONNECTOR_FAVICON_256_PNG,
+  CONNECTOR_FAVICON_256_PNG_SHA256,
+  CONNECTOR_ICON_PNG,
+  CONNECTOR_ICON_PNG_SHA256,
+} from "./connector-icon-assets.js";
+
+export * from "./connector-icon-assets.js";
+
 export const CONNECTOR_NAME = "Wave Accounting";
+export const CONNECTOR_ORIGIN = "https://wave.amesvt.com";
+export const CONNECTOR_ICON_URL = `${CONNECTOR_ORIGIN}/assets/wave-icon-v1.png`;
 
 export const REMOTE_SERVER_INFO = {
   name: "wave_mcp",
   version: "1.0.0",
+  title: CONNECTOR_NAME,
+  icons: [
+    { src: CONNECTOR_ICON_URL, mimeType: "image/png", sizes: ["256x256"] },
+  ],
 };
+
+export { CONNECTOR_FAVICON_256_PNG, CONNECTOR_FAVICON_256_PNG_SHA256 };
+export { CONNECTOR_ICON_PNG, CONNECTOR_ICON_PNG_SHA256 };
 
 export const CONNECTOR_RESOURCE_METADATA = {
   resource_name: CONNECTOR_NAME,
