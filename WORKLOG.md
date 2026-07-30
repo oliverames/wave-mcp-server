@@ -3,6 +3,20 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-07-29 - Match TinyFish favicon structure for Claude testing
+
+**What changed**: Expanded the hosted favicon from four to six ICO entries at 16, 32, 48, 64, 128, and 256 pixels. The favicon response now uses revalidation caching while retaining its ETag.
+
+**Decisions made**: Reproduced only the observable TinyFish differences. This is an experiment, not evidence that Claude supports custom connector favicon branding.
+
+**Verification**: Parsed all six generated and deployed ICO entries. All 37 Worker tests and 58 root tests pass, release consistency and the Wrangler dry run pass, GitHub Actions passes, and Cloudflare deployment ebcf5228-2b5b-4c71-8fd4-6b8be2654921 is live.
+
+**Left off at**: Disconnect and add Wave Financial again in Claude to test whether it refreshes the connector card.
+
+**Open questions**: Whether Claude reads the origin favicon for custom connectors remains undocumented.
+
+---
+
 ## 2026-07-29 - Add hosted connector icon discovery
 
 **What changed**: Added reproducible Worker icon generation from the canonical `assets/icon.png`, including 8-bit PNGs at 16, 32, 48, 64, 96, 128, and 256 pixels, an Apple touch icon, and a multi-size ICO. The Worker now serves those assets with cache and cross-origin headers, advertises them from its public pages, and includes the versioned 256-pixel icon in MCP server metadata.
