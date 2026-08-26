@@ -396,3 +396,26 @@ test("deleteAllTokenRecords removes every connection for one user only", async (
   assert.equal(deleted, 2);
   assert.ok(store.has("wave:token:user-2:key-c"), "another user's record was deleted");
 });
+
+test("deleteAllTokenRecords does not sweep ids that merely extend the target id", async () => {
+  // A bare `wave:token:user-1` prefix also matches user-10 and user-11; the
+  // list key must carry the trailing colon that separates id from tokenKey.
+  const store = new Map([
+    ["wave:token:user-1:key-a", "x"],
+    ["wave:token:user-10:key-c", "x"],
+  ]);
+  const kv = {
+    async list({ prefix }) {
+      return {
+        keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })),
+        list_complete: true,
+      };
+    },
+    async delete(name) {
+      store.delete(name);
+    },
+  };
+  const deleted = await deleteAllTokenRecords(kv, "user-1");
+  assert.equal(deleted, 1);
+  assert.ok(store.has("wave:token:user-10:key-c"), "a sibling-prefix user's records were deleted");
+});

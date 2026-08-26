@@ -279,8 +279,11 @@ export async function readTokenRecord(kv, waveUserId, tokenKey, encryptionSecret
 export async function deleteAllTokenRecords(kv, waveUserId) {
   let deleted = 0;
   let cursor;
+  // The trailing colon matters: a bare `wave:token:user-1` prefix would also
+  // match user-10, user-11, and every other id that extends it.
+  const prefix = tokenRecordKey(waveUserId, "");
   do {
-    const page = await kv.list({ prefix: `wave:token:${waveUserId}`, cursor });
+    const page = await kv.list({ prefix, cursor });
     for (const entry of page.keys) {
       await kv.delete(entry.name);
       deleted += 1;

@@ -3,6 +3,47 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-08-25 - Comprehensive bug-fixing pass: five defects, four in the shared server
+
+**Context**: A full read-through of `index.js` (5,845 lines) and every module
+under `worker/src/`, with each suspected defect reproduced against the live
+code before fixing.
+
+**Fixed**:
+
+1. `deleteAllTokenRecords` swept sibling user ids. The KV list used the prefix
+   `wave:token:<userId>` with no trailing colon, so deleting user-1's records
+   also deleted user-10's. Reproduced with a mock KV before fixing; the list
+   key now goes through `tokenRecordKey(userId, "")`, which carries the colon.
+2. Auto-generated `externalId` values collided within one millisecond. Wave
+   dedupes on externalId, so two rapid creates shared an id and the second
+   was silently dropped as a duplicate. Measured: 199,843 collisions across
+   200,000 tight-loop generations. A random tail now follows the timestamp;
+   caller-supplied ids are still preserved untouched.
+3. A stalled response body hung a tool call indefinitely. The abort timer was
+   cleared once headers arrived, but `response.text()` ran afterwards, so a
+   server that sent headers and never delivered bytes would hang past both
+   the per-attempt timeout and the total budget. The body is now read inside
+   the abort window, and a body-level abort flows into the existing retry and
+   error paths.
+4. `scoreAccount`'s startsWith branch was unreachable: includes was checked
+   first at a higher score, so "Office Supplies" scored identically whether
+   the category opened the name or appeared mid-name. Specificity now ranks:
+   exact 1.0, startsWith 0.95, mid-name 0.9. Both remain above the 0.55
+   confidence floor, so only ranking between candidate accounts changes.
+5. Malformed JSON from Wave surfaced as a bare SyntaxError. It is now a
+   sanitized `WaveError` carrying the HTTP status and a 200-character body
+   snippet, consistent with every other transport failure.
+
+**Verification**: 62 of 62 root tests pass (four new), 39 of 39 Worker tests
+pass (one new), `smoke:list-tools` reports all 104 tools registered,
+`release:check` is clean, and `node --check` passes. The stalled-body test
+stubs `fetch` with a signal-wired stream matching undici's behavior, verified
+against a real stalling HTTP server first. Note for future transport tests:
+the server floors `WAVE_TIMEOUT_MS` at 1,000 ms via `envNumber`.
+
+---
+
 ## 2026-07-30 - Found why Claude showed the wrong connector icon
 
 **Context**: Reverses the 2026-07-29 six-frame ICO experiment, which was a guess

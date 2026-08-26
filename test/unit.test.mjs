@@ -14,6 +14,12 @@ import { test } from "node:test";
 process.env.WAVE_MCP_NO_AUTOSTART = "1";
 process.env.WAVE_DISABLE_AGENT_CONFIG_FALLBACK = "1";
 process.env.WAVE_ACCESS_TOKEN = process.env.WAVE_ACCESS_TOKEN || "unit-test-token";
+// The transport tests below stub globalThis.fetch and rely on short deadlines;
+// waveFetch reads all three from the environment once, at import time. The
+// server floors WAVE_TIMEOUT_MS at one second, which keeps this fast enough.
+process.env.WAVE_TIMEOUT_MS = "1000";
+process.env.WAVE_TOTAL_BUDGET_MS = "5000";
+process.env.WAVE_HTTP_RETRIES = "0";
 
 const module = await import("../index.js");
 const { createWaveServer, __testables } = module;
@@ -148,6 +154,13 @@ test("a supplied external id is preserved so retries stay idempotent", () => {
   assert.match(H.externalId("prefix", null), /^prefix-\d{8}T\d{6}/);
 });
 
+test("auto-generated external ids never collide, even within one millisecond", () => {
+  // Wave dedupes on externalId: two same-instant creates used to share an id,
+  // and the second transaction was silently dropped as a duplicate.
+  const ids = new Set(Array.from({ length: 500 }, () => H.externalId("prefix", null)));
+  assert.equal(ids.size, 500);
+});
+
 // --- Addresses --------------------------------------------------------------
 
 test("an empty address is omitted rather than sent as an empty object", () => {
@@ -223,6 +236,14 @@ test("a synonym maps an everyday word onto the right account", () => {
   const match = H.matchAccount("food", ACCOUNTS, H.EXPENSE_SYNONYMS, "expense");
   assert.equal(match.account.id, "a1");
   assert.ok(match.score >= 0.8);
+});
+
+test("a name that starts with the category outranks a mid-name occurrence", () => {
+  // The startsWith branch used to be unreachable: includes was checked first
+  // at a higher score, so both shapes scored identically.
+  const [startsWithScore] = H.scoreAccount("office", { name: "Office Supplies" }, {});
+  const [midNameScore] = H.scoreAccount("office", { name: "Small Office Equipment" }, {});
+  assert.ok(startsWithScore > midNameScore, `${startsWithScore} must outrank ${midNameScore}`);
 });
 
 test("a substring match beats a fuzzy one", () => {
@@ -452,4 +473,50 @@ test("token-shaped strings are redacted before reaching stderr", () => {
   );
   assert.ok(!redacted.includes("sk-live-abc123def456"));
   assert.match(redacted, /REDACTED_TOKEN/);
+});
+
+// --- Transport --------------------------------------------------------------
+
+test("a stalled response body cannot outlive the per-attempt timeout", async () => {
+  // Headers arrive immediately but the stream never delivers bytes. The abort
+  // timer must stay armed until the body has been read; the stub wires the
+  // fetch signal into the body stream the way undici does.
+  const originalFetch = globalThis.fetch;
+  let bail;
+  globalThis.fetch = async (url, init = {}) => {
+    const signal = init.signal;
+    const stream = new ReadableStream({
+      start(streamController) {
+        const abort = () =>
+          streamController.error(Object.assign(new Error("This operation was aborted"), { name: "AbortError" }));
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      },
+    });
+    return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    await assert.rejects(
+      Promise.race([
+        H.waveFetch("query StallProbe { user { id } }"),
+        new Promise((_, reject) => {
+          bail = setTimeout(() => reject(new Error("stalled body was not aborted")), 3000);
+        }),
+      ]),
+      /Could not reach the Wave API/
+    );
+  } finally {
+    clearTimeout(bail);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a malformed JSON body becomes a WaveError, not a bare SyntaxError", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('{"data":', { status: 200 });
+  try {
+    await assert.rejects(() => H.waveFetch("query BadJsonProbe { user { id } }"), /malformed JSON body/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

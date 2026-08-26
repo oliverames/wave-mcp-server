@@ -884,6 +884,7 @@ async function waveFetch(query, variables = {}) {
     const timer = setTimeout(() => controller.abort(), Math.min(DEFAULT_TIMEOUT_MS, Math.max(budgetLeft(), 1)));
 
     let response;
+    let raw;
     try {
       response = await fetch(url, {
         method: "POST",
@@ -895,6 +896,11 @@ async function waveFetch(query, variables = {}) {
         body,
         signal: controller.signal,
       });
+      // The body is read under the same deadline as the headers. Clearing the
+      // timer first would let a server that sends headers but stalls the
+      // stream hang the call past both the per-attempt timeout and the total
+      // budget, with no error until the client gives up.
+      raw = await response.text();
     } catch (error) {
       lastError = error;
       // A GraphQL POST is not idempotent in general, but Wave dedupes writes
@@ -943,11 +949,10 @@ async function waveFetch(query, variables = {}) {
     }
 
     if (!response.ok) {
-      const text = sanitizeErrorMessage((await response.text()).slice(0, 500));
+      const text = sanitizeErrorMessage(raw.slice(0, 500));
       throw new WaveError(`Wave returned HTTP ${response.status}: ${text}`);
     }
 
-    const raw = await response.text();
     if (raw.length > MAX_RESPONSE_BYTES) {
       throw new WaveError(
         `Wave returned ${raw.length} bytes, over the ${MAX_RESPONSE_BYTES}-byte cap. ` +
@@ -955,7 +960,14 @@ async function waveFetch(query, variables = {}) {
       );
     }
 
-    const payload = JSON.parse(raw);
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      throw new WaveError(
+        `Wave returned a malformed JSON body (HTTP ${response.status}): ${sanitizeErrorMessage(raw.slice(0, 200))}`
+      );
+    }
     raiseForGraphQLErrors(payload);
     return payload.data ?? {};
   }
@@ -1333,8 +1345,17 @@ function normalizeRecipients(to, context) {
 function externalId(prefix, supplied) {
   if (supplied) return supplied;
   // Wave dedupes on externalId, so a caller-supplied value makes retries safe.
-  // When none is given, a timestamped value keeps each call distinct.
-  return `${prefix}-${new Date().toISOString().replace(/[-:.]/g, "")}`;
+  // When none is given, a timestamped value keeps calls apart -- plus a random
+  // tail, because two creates inside the same millisecond would otherwise share
+  // an id and Wave would silently drop the second as a duplicate.
+  const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+  let random = "";
+  if (globalThis.crypto?.getRandomValues) {
+    random = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(4)), (byte) =>
+      byte.toString(36).padStart(2, "0")
+    ).join("");
+  }
+  return `${prefix}-${timestamp}${random ? `-${random}` : ""}`;
 }
 
 /**
@@ -5378,8 +5399,10 @@ function scoreAccount(category, account, synonyms) {
   const name = (account.name || "").toLowerCase();
 
   if (needle === name) return [1, `exact name match on '${account.name}'`];
-  if (name.includes(needle)) return [0.95, `'${category}' appears in '${account.name}'`];
-  if (name.startsWith(needle)) return [0.9, `'${account.name}' starts with '${category}'`];
+  // A name that opens with the category is a stronger signal than one where it
+  // merely appears, so startsWith is checked first and scores higher.
+  if (name.startsWith(needle)) return [0.95, `'${account.name}' starts with '${category}'`];
+  if (name.includes(needle)) return [0.9, `'${category}' appears in '${account.name}'`];
 
   let best = 0;
   let why = "";
@@ -5756,6 +5779,7 @@ registerResource(
       sanitizeErrorMessage,
       assertWaveApiUrl,
       requireBusinessId,
+      waveFetch,
       EXPENSE_SYNONYMS,
       INCOME_SYNONYMS,
       WaveError,
