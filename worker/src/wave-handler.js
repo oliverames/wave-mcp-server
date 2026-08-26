@@ -31,6 +31,8 @@ import {
   CONNECTOR_FAVICON_SVG_SHA256,
 } from "./brand-assets.js";
 import {
+  base64url,
+  base64urlDecode,
   buildWaveAuthorizeUrl,
   exchangeCodeForTokens,
   fetchWaveUser,
@@ -40,6 +42,7 @@ import {
   randomToken,
   saveTokenRecord,
   scopesFor,
+  sha256base64url,
   toTokenRecord,
   deleteAllTokenRecords,
 } from "./wave-oauth.js";
@@ -143,8 +146,9 @@ app.get("/authorize", async (c) => {
     );
   }
   // Sign the request so the POST cannot be forged or tampered with between
-  // the two steps.
-  const payload = btoa(JSON.stringify(oauthRequest));
+  // the two steps. base64url over UTF-8 bytes rather than btoa, which throws
+  // on any non-Latin1 character a client id or redirect could carry.
+  const payload = base64url(new TextEncoder().encode(JSON.stringify(oauthRequest)));
   const signature = await hmacSign(c.env.COOKIE_ENCRYPTION_KEY, payload);
 
   return c.html(
@@ -169,7 +173,7 @@ app.post("/authorize", async (c) => {
     return c.html(layout("Invalid request", messagePage("Invalid request", "This consent form could not be verified. Start again from your MCP client.")), 400);
   }
 
-  const oauthRequest = JSON.parse(atob(payload));
+  const oauthRequest = JSON.parse(new TextDecoder().decode(base64urlDecode(payload)));
   const stateId = randomToken(24);
   await putState(c.env, stateId, { oauthRequest, writesEnabled: allowWrites });
 
@@ -263,7 +267,26 @@ app.get("/callback", async (c) => {
  *
  * A hosted connector that stores refresh tokens needs a way for a user to
  * revoke it without contacting anyone.
+ *
+ * The page works user-wide by design: revoking should not require knowing how
+ * many connections exist. That makes it an unauthenticated destructive
+ * endpoint, so attempts are rate limited per client IP in the state Durable
+ * Object -- scripted sweeps get expensive, while a person revoking once is
+ * unaffected.
  */
+const DELETE_RATE_LIMIT = 5;
+const DELETE_RATE_WINDOW_MS = 60 * 60 * 1000;
+
+async function deleteRateLimited(c) {
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  const identity = await sha256base64url(`delete:${ip}`);
+  const response = await stateStub(c.env, `rate:${identity}`).fetch(
+    `https://state/rate/delete?limit=${DELETE_RATE_LIMIT}&window_ms=${DELETE_RATE_WINDOW_MS}`,
+    { method: "POST" }
+  );
+  return (await response.json()).allowed === true;
+}
+
 app.get("/delete", async (c) => {
   const csrf = randomToken(24);
   await putState(c.env, `delete:${csrf}`, { issued: true });
@@ -271,6 +294,13 @@ app.get("/delete", async (c) => {
 });
 
 app.post("/delete", async (c) => {
+  if (!(await deleteRateLimited(c))) {
+    return new Response(
+      layout("Too many attempts", messagePage("Too many attempts", "Try again later.")),
+      { status: 429, headers: { "Retry-After": String(DELETE_RATE_WINDOW_MS / 1000) } }
+    );
+  }
+
   const form = await c.req.formData();
   const csrf = String(form.get("csrf") ?? "");
   const waveUserId = String(form.get("wave_user_id") ?? "").trim();

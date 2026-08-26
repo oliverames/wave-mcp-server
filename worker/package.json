@@ -11,8 +11,9 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "~0.8.1",
-    "agents": "~0.17.4",
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "agents": "0.21.0",
     "hono": "^4.12.27"
   },
   "devDependencies": {

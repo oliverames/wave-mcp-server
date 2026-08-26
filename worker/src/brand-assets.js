@@ -26,6 +26,11 @@ export { CONNECTOR_FAVICON_256_PNG, CONNECTOR_FAVICON_256_PNG_SHA256 };
 export { CONNECTOR_ICON_PNG, CONNECTOR_ICON_PNG_SHA256 };
 
 export const CONNECTOR_RESOURCE_METADATA = {
+  // Pinning grants and token audiences to this exact URL is what
+  // workers-oauth-provider recommends now that it enforces RFC 8707 strictly;
+  // clients that omit a resource indicator default to it rather than staying
+  // unbound. resource_documentation rides along for resolvers that read it.
+  resource: `${CONNECTOR_ORIGIN}/mcp`,
   resource_name: CONNECTOR_NAME,
   resource_documentation: "https://github.com/oliverames/wave-mcp-server#readme",
 };

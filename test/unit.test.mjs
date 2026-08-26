@@ -10,6 +10,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 process.env.WAVE_MCP_NO_AUTOSTART = "1";
 process.env.WAVE_DISABLE_AGENT_CONFIG_FALLBACK = "1";
@@ -579,4 +581,30 @@ test("a fetch_all sweep that finishes reports completeness as before", async () 
 
 test("pagination footer warns when a sweep was cut short by the ceiling", () => {
   assert.match(H.paginationFooter({ truncated: true, count: 1000 }), /may be incomplete/);
+});
+
+// --- Structured output ------------------------------------------------------
+
+test("wave_auth_status returns schema-valid structured content over MCP", async () => {
+  // The SDK validates structuredContent against the declared outputSchema on
+  // every successful call; a mismatch would surface as a protocol error here.
+  const server = createWaveServer({ getAccessToken: async () => "t", hasCredentials: true, writesEnabled: false });
+  const client = new Client({ name: "structured-test", version: "1" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    const result = await client.callTool({ name: "wave_auth_status", arguments: {} });
+    assert.notEqual(result.isError, true);
+    const structured = result.structuredContent;
+    assert.equal(structured.has_credentials, true);
+    assert.equal(structured.writes_enabled, false);
+    assert.equal(typeof structured.registered_tools, "number");
+    assert.ok(Array.isArray(structured.sources_checked));
+    const listed = (await client.listTools()).tools.find((tool) => tool.name === "wave_auth_status");
+    assert.ok(listed.outputSchema, "output schema was not advertised over tools/list");
+    assert.match(result.content[0].text, /\{/, "text fallback still carries the JSON");
+  } finally {
+    await client.close();
+    await server.server.close();
+  }
 });

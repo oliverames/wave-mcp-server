@@ -12,6 +12,7 @@ import { test } from "node:test";
 
 import { rejectUntrustedMcpOrigin, allowedMcpOrigins } from "../src/mcp-origin.js";
 import { applyTransportSecurityHeaders } from "../src/response-security.js";
+import { OAuthTransientState } from "../src/oauth-transient-state.js";
 import {
   encryptStoredJson,
   decryptStoredJson,
@@ -23,6 +24,7 @@ import {
   WRITE_SCOPES,
   buildWaveAuthorizeUrl,
   base64url,
+  base64urlDecode,
   isAllowedWaveUser,
   fetchWaveUser,
 } from "../src/wave-oauth.js";
@@ -218,6 +220,68 @@ test("a non-JSON identity response is reported clearly instead of as a SyntaxErr
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// --- Consent payload encoding ----------------------------------------------
+
+test("the consent payload survives non-Latin1 characters", async () => {
+  // btoa throws on any code point above U+00FF; the base64url byte path does not.
+  const request = { clientId: "clément-ünïcode", redirectUri: "https://例え.テスト/cb" };
+  const encoded = base64url(new TextEncoder().encode(JSON.stringify(request)));
+  const decoded = JSON.parse(new TextDecoder().decode(base64urlDecode(encoded)));
+  assert.deepEqual(decoded, request);
+});
+
+// --- Rate limiter -----------------------------------------------------------
+
+class MockStorage {
+  constructor() {
+    this.map = new Map();
+  }
+  async get(key) {
+    return this.map.get(key);
+  }
+  async put(key, value) {
+    this.map.set(key, value);
+  }
+  async delete(key) {
+    return this.map.delete(key);
+  }
+}
+
+test("the rate limiter allows hits up to the limit and then refuses", async () => {
+  const state = new OAuthTransientState({ storage: new MockStorage() });
+  const hit = () =>
+    state
+      .fetch(new Request("https://state/rate/delete?limit=3&window_ms=60000", { method: "POST" }))
+      .then((response) => response.json());
+  assert.deepEqual(await hit(), { allowed: true, count: 1 });
+  assert.deepEqual(await hit(), { allowed: true, count: 2 });
+  assert.deepEqual(await hit(), { allowed: true, count: 3 });
+  const denied = await hit();
+  assert.equal(denied.allowed, false, "hit past the limit was allowed");
+});
+
+test("rate-limit windows reset after the window elapses", async () => {
+  const state = new OAuthTransientState({ storage: new MockStorage() });
+  const hit = () =>
+    state
+      .fetch(new Request("https://state/rate/delete?limit=1&window_ms=1000", { method: "POST" }))
+      .then((response) => response.json());
+  assert.equal((await hit()).allowed, true);
+  assert.equal((await hit()).allowed, false);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  assert.equal((await hit()).allowed, true, "a new window did not get a fresh counter");
+});
+
+test("each rate bucket leaves at most two keys in storage", async () => {
+  const storage = new MockStorage();
+  const state = new OAuthTransientState({ storage });
+  const hit = () =>
+    state.fetch(new Request("https://state/rate/delete?limit=50&window_ms=60000", { method: "POST" }));
+  for (let i = 0; i < 5; i += 1) await hit();
+  const rateKeys = [...storage.map.keys()].filter((key) => key.startsWith("/rate/"));
+  assert.ok(rateKeys.length <= 2, `expected at most two bucket keys, found ${rateKeys.length}`);
 });
 
 // --- Signing ----------------------------------------------------------------

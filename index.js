@@ -1471,6 +1471,9 @@ function registerTool(name, config, handler) {
     title: config.title ?? humanizeToolName(name),
     description: config.description,
     inputSchema: config.inputSchema ?? {},
+    // Declared per tool; the SDK then validates every successful
+    // structuredContent against it before responding.
+    outputSchema: config.outputSchema,
     annotations: {
       title: config.title ?? humanizeToolName(name),
       readOnlyHint: readOnly,
@@ -1576,12 +1579,38 @@ query GetOAuthApplication {
   oAuthApplication { id name description clientId logoUrl createdAt modifiedAt }
 }`);
 
+// Output contract for wave_auth_status. It is the one tool whose result is a
+// stable, machine-consumed shape rather than Wave entity data, so it carries a
+// real outputSchema: the SDK validates every successful response against it,
+// and clients can parse structuredContent without scraping markdown.
+const authStatusOutputSchema = {
+  has_credentials: z.boolean(),
+  token_source: z.string().nullable(),
+  writes_enabled: z.boolean(),
+  default_business_id: z.string().nullable(),
+  detected_agent: z.string(),
+  config_fallback_disabled: z.boolean(),
+  sources_checked: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      path: z.string().nullable(),
+      found: z.boolean(),
+    })
+  ),
+  lookup_errors: z.array(z.string()),
+  registered_tools: z.number().int(),
+  write_tools_hidden: z.number().int(),
+  next_step: z.string().optional(),
+};
+
 registerTool(
   "wave_auth_status",
   {
     readOnly: true,
     description:
       "Report how this server resolved its Wave credentials and whether write tools are enabled. Makes no Wave API request, so it works even when the token is missing or expired -- use it first when other tools report authentication problems.",
+    outputSchema: authStatusOutputSchema,
   },
   async () => {
     const status = {
@@ -1603,7 +1632,10 @@ registerTool(
       status.next_step =
         "Read tools are active. Set WAVE_ALLOW_WRITES=1 to enable the tools that create, change, delete, or email records.";
     }
-    return ok(jsonText(status));
+    return {
+      content: [{ type: "text", text: jsonText(status) }],
+      structuredContent: status,
+    };
   }
 );
 
@@ -4341,6 +4373,7 @@ function estimateDetail(estimate) {
       ["Memo", estimate.memo],
       ["Footer", estimate.footer],
       ["Last sent", estimate.lastSentAt],
+      ["Last sent via", estimate.lastSentVia],
       ["Last viewed", estimate.lastViewedAt],
       ["View URL", estimate.viewUrl],
       ["PDF URL", estimate.pdfUrl],

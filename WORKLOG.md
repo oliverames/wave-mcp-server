@@ -3,6 +3,71 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-08-26 - Deferred items cleared: worker stack upgraded, structured output, delete hardening
+
+**Context**: The 2026-08-25 pass deferred three items. All three are now done
+to the extent verifiable without production credentials.
+
+**Worker dependencies upgraded**: `@cloudflare/workers-oauth-provider`
+0.8.1 -> 0.10.3, `agents` 0.17.4 -> 0.21.0, and the MCP SDK pinned at 1.30.0
+as a direct dependency (agents made it a peer). API compatibility was checked
+against the installed type definitions first: every constructor option we use
+survived, `McpAgent.serve/serveSSE` are unchanged, and `init()`/`props` work
+as before. Note: upstream now marks McpAgent feature-frozen in favor of a
+createMcpHandler factory; migrating is future work, not urgent.
+
+**Strict resource pinning adopted**: the provider enforces RFC 8707 properly
+now, so CONNECTOR_RESOURCE_METADATA gained `resource:
+https://wave.amesvt.com/mcp`. Grants and token audiences pin to that URL,
+clients that omit the parameter default to it instead of staying unbound, and
+pre-upgrade grants inherit it rather than breaking. This follows the
+maintainer recommendation and the MCP authorization spec's resource-indicator
+requirement.
+
+**Local end-to-end verification** (wrangler dev, miniflare -- the full Worker
+including Durable Objects): 24 checks covering dynamic client registration,
+the consent flow with signed payload, tamper rejection, single-use callback
+state, S256-only PKCE enforcement, strict resource metadata advertising,
+origin gating on both transports, and the unauthenticated /mcp challenge.
+Plus 3 checks for the new delete limiter. The one thing local verification
+cannot cover is the Wave login leg itself, which needs Oliver's credentials.
+
+**Structured output started**: wave_auth_status now declares an outputSchema
+and returns structuredContent alongside its JSON text block (spec 2025-06-18).
+The SDK validates every successful response against the schema server-side.
+It is deliberately the only tool with one: its shape is stable and
+machine-consumed, while entity tools return markdown-or-Wave-JSON by design.
+Writing schemas for ~100 dynamic shapes would be churn without a consumer.
+The pass also fixed a latent gap the test caught: registerTool was silently
+dropping any outputSchema it was given.
+
+**Delete endpoint hardened**: POST /delete is rate limited to five attempts
+per hour per client IP, counted in the OAuth state Durable Object (storage
+input gates make the counter race-free) keyed by a hashed CF-Connecting-IP.
+The public user-wide revoke UX is unchanged; scripted token-wipe sweeps get
+expensive. The residual risk is unchanged in kind -- anyone can still revoke
+the owner's tokens five times an hour -- but abuse now costs time. A
+Cloudflare WAF rate-limit rule would add network-level defense if wanted.
+
+**Smaller fixes**: consent payloads moved from btoa to base64url over UTF-8
+bytes, so a non-Latin1 client id or redirect URI cannot crash /authorize;
+wave_auth_status-style detail addition -- estimate detail views now include
+"Last sent via"; base64urlDecode exported for the round trip.
+
+**Verification**: 67 of 67 root tests (one new, driving a real MCP session
+over InMemoryTransport), 44 of 44 worker tests (five new), smoke:list-tools
+unchanged, release:check clean, and the two wrangler-dev E2E suites above.
+
+**Blocked, needs Oliver**: production deploy. No Workers-deploy credential
+exists on this machine (no cached wrangler OAuth token; no matching item in
+1Password beyond Pages/R2/scoped tokens). To ship: `wrangler login`, or add a
+Cloudflare API token item with Workers deploy permissions to 1Password and map
+it in ~/.claude/.env. After deploy, re-run both probe suites against the live
+host, then complete one real Wave authorization to close the loop. Rollback
+is `npx wrangler rollback` in worker/.
+
+---
+
 ## 2026-08-25 - Improvement pass: security bumps, API-doc accuracy, honest pagination
 
 **Context**: Second pass over the codebase, this time against live sources:
