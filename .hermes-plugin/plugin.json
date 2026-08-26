@@ -1,7 +1,7 @@
 {
   "name": "wave-mcp-server",
   "displayName": "Wave",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Wave Accounting MCP connector for invoices, estimates, customers, products, sales taxes, payments, the chart of accounts, and double-entry bookkeeping.",
   "author": {
     "name": "Oliver Ames",

@@ -29,7 +29,34 @@ import { z } from "zod";
 // import-time config resolution and the stdio autostart are both skipped.
 const IS_CLOUDFLARE_WORKERS = globalThis.navigator?.userAgent === "Cloudflare-Workers";
 
-const SERVER_VERSION = "1.0.2";
+const SERVER_VERSION = "1.0.3";
+
+// --- Structured Logging ---
+// JSON lines on stderr. stdout carries the MCP stdio JSON-RPC stream, so
+// nothing here may ever write to it. No dependency, so this also runs
+// unchanged under Cloudflare Workers, where console.error reaches worker logs.
+
+const LOG_LEVELS = { debug: 10, info: 20, warn: 30, error: 40, silent: 100 };
+const LOG_LEVEL =
+  LOG_LEVELS[globalThis.process?.env?.WAVE_LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.info;
+
+function makeLogger(bindings = {}) {
+  const emit = (level, message, meta) => {
+    if (LOG_LEVELS[level] < LOG_LEVEL) return;
+    console.error(
+      JSON.stringify({ time: new Date().toISOString(), level, message, ...bindings, ...meta })
+    );
+  };
+  return {
+    debug: (message, meta) => emit("debug", message, meta),
+    info: (message, meta) => emit("info", message, meta),
+    warn: (message, meta) => emit("warn", message, meta),
+    error: (message, meta) => emit("error", message, meta),
+    child: (extra) => makeLogger({ ...bindings, ...extra }),
+  };
+}
+
+const logger = makeLogger({ service: "wave-mcp-server", version: SERVER_VERSION });
 const WAVE_ENDPOINT = "https://gql.waveapps.com/graphql/public";
 const WAVE_API_HOST = "gql.waveapps.com";
 const MAX_TOKEN_FILE_BYTES = 4096;
@@ -60,7 +87,25 @@ const WAVE_RUNTIME_KEYS = [
   "WAVE_OP_PATH",
   "WAVE_BUSINESS_ID",
   "WAVE_ALLOW_WRITES",
+  "WAVE_TRACING_ENABLED",
+  "WAVE_LOG_LEVEL",
 ];
+
+// Tracing configuration (W3C Trace Context propagation)
+const TRACING_ENABLED = truthyFlag(globalThis.process?.env?.WAVE_TRACING_ENABLED);
+const TRACE_ID_HEADER = "traceparent";
+
+function randomHex(byteLength) {
+  const bytes = new Uint8Array(byteLength);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Build a `traceparent` value: version-traceid-spanid-flags. The spec rejects
+// an all-zero trace-id or span-id, so both are drawn from the CSPRNG.
+function generateTraceId() {
+  return `00-${randomHex(16)}-${randomHex(8)}-01`;
+}
 
 const runtimeConfig = IS_CLOUDFLARE_WORKERS
   ? {
@@ -823,6 +868,66 @@ class WaveMutationError extends WaveError {
   }
 }
 
+// --- Enhanced Error Types ---
+// More granular error types for better error categorization and handling.
+
+/** Thrown when input validation fails before reaching Wave. */
+class WaveValidationError extends WaveError {
+  constructor(message, field = null) {
+    super(message);
+    this.name = "WaveValidationError";
+    this.field = field;
+  }
+}
+
+/** Thrown when a rate limit is encountered. */
+class WaveRateLimitError extends WaveError {
+  constructor(message, retryAfterMs = null) {
+    super(message);
+    this.name = "WaveRateLimitError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/** Thrown when a record is not found. */
+class WaveNotFoundError extends WaveError {
+  constructor(message, resource = null, id = null) {
+    super(message);
+    this.name = "WaveNotFoundError";
+    this.resource = resource;
+    this.id = id;
+  }
+}
+
+/** Thrown when an operation times out. */
+class WaveTimeoutError extends WaveError {
+  constructor(message, operation = null, durationMs = null) {
+    super(message);
+    this.name = "WaveTimeoutError";
+    this.operation = operation;
+    this.durationMs = durationMs;
+  }
+}
+
+/** Thrown when a server-side error occurs. */
+class WaveServerError extends WaveError {
+  constructor(message, status = null, statusText = null) {
+    super(message);
+    this.name = "WaveServerError";
+    this.status = status;
+    this.statusText = statusText;
+  }
+}
+
+/** Thrown when a network error occurs. */
+class WaveNetworkError extends WaveError {
+  constructor(message, cause = null) {
+    super(message);
+    this.name = "WaveNetworkError";
+    this.cause = cause;
+  }
+}
+
 // --- Transport ---
 
 /**
@@ -860,11 +965,13 @@ function retryAfterMs(response) {
  * timeout (Codex kills a call at 60s by default).
  */
 async function waveFetch(query, variables = {}) {
+  const traceId = TRACING_ENABLED ? generateTraceId() : undefined;
   const url = new URL(WAVE_ENDPOINT);
   assertWaveApiUrl(url);
 
   const accessToken = getAccessToken ? await getAccessToken() : null;
   if (!accessToken) {
+    logger.error("No Wave access token available, aborting waveFetch");
     throw new WaveAuthError(
       "No Wave access token is available. Set WAVE_ACCESS_TOKEN, or reconnect this MCP server to Wave and try again."
     );
@@ -874,6 +981,12 @@ async function waveFetch(query, variables = {}) {
   const body = JSON.stringify({ query, variables: stripUndefined(variables) });
   const started = Date.now();
   const budgetLeft = () => DEFAULT_TOTAL_BUDGET_MS - (Date.now() - started);
+  const elapsedMs = () => Date.now() - started;
+
+  logger.debug(`Starting waveFetch: ${query.slice(0, 80)}${traceId ? ` (trace: ${traceId})` : ""}`, {
+    queryPreview: query.slice(0, 100),
+    traceId,
+  });
 
   let lastError = null;
 
@@ -890,6 +1003,7 @@ async function waveFetch(query, variables = {}) {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
           "User-Agent": `mcp-server-for-wave/${SERVER_VERSION}`,
+          ...(traceId && { [TRACE_ID_HEADER]: traceId }),
         },
         body,
         signal: controller.signal,
@@ -909,9 +1023,16 @@ async function waveFetch(query, variables = {}) {
         await sleep(delay);
         continue;
       }
-      throw new WaveError(
+      logger.error(`waveFetch failed after ${attempt + 1} attempts`, {
+        error: error.message,
+        traceId,
+        elapsedMs: elapsedMs(),
+        attempts: attempt + 1,
+      });
+      throw new WaveNetworkError(
         `Could not reach the Wave API: ${sanitizeErrorMessage(error.message)}. ` +
-          `Gave up after ${Math.round((Date.now() - started) / 1000)}s.`
+          `Gave up after ${Math.round((Date.now() - started) / 1000)}s.`,
+        error
       );
     } finally {
       clearTimeout(timer);
@@ -920,9 +1041,10 @@ async function waveFetch(query, variables = {}) {
     if (response.status === 429) {
       const delay = retryAfterMs(response) ?? backoffMs(attempt);
       if (attempt >= HTTP_RETRIES || delay >= budgetLeft()) {
-        throw new WaveError(
+        throw new WaveRateLimitError(
           "Wave rate limit reached. Wave allows only about two concurrent requests. " +
-            "Wait a moment and retry, or lower page_size / avoid fetch_all on large lists."
+            "Wait a moment and retry, or lower page_size / avoid fetch_all on large lists.",
+          delay
         );
       }
       await sleep(delay);
@@ -937,18 +1059,30 @@ async function waveFetch(query, variables = {}) {
     }
 
     if (response.status >= 500) {
-      lastError = new WaveError(`Wave returned HTTP ${response.status}.`);
+      lastError = new WaveServerError(`Wave returned HTTP ${response.status}.`, response.status, response.statusText);
       const delay = backoffMs(attempt);
       if (attempt < HTTP_RETRIES && delay < budgetLeft()) {
         await sleep(delay);
         continue;
       }
+      logger.error(`Wave server error after ${attempt + 1} attempts`, {
+        status: response.status,
+        statusText: response.statusText,
+        traceId,
+        elapsedMs: elapsedMs(),
+        attempts: attempt + 1,
+      });
       throw lastError;
     }
 
     if (!response.ok) {
       const text = sanitizeErrorMessage(raw.slice(0, 500));
-      throw new WaveError(`Wave returned HTTP ${response.status}: ${text}`);
+      logger.error(`Wave returned non-ok response`, {
+        status: response.status,
+        text,
+        traceId,
+      });
+      throw new WaveServerError(`Wave returned HTTP ${response.status}: ${text}`, response.status, response.statusText);
     }
 
     if (raw.length > MAX_RESPONSE_BYTES) {
@@ -967,13 +1101,27 @@ async function waveFetch(query, variables = {}) {
       );
     }
     raiseForGraphQLErrors(payload);
-    return payload.data ?? {};
+    const result = payload.data ?? {};
+
+    logger.debug(`waveFetch completed successfully`, {
+      resultCount: Object.keys(result || {}).length,
+      traceId,
+    });
+
+    return result;
   }
 
-  throw new WaveError(
+  const error = new WaveTimeoutError(
     `Wave API did not respond within ${Math.round(DEFAULT_TOTAL_BUDGET_MS / 1000)}s: ` +
-      `${sanitizeErrorMessage(lastError?.message)}. Raise WAVE_TOTAL_BUDGET_MS if your MCP client allows a longer tool timeout.`
+      `${sanitizeErrorMessage(lastError?.message)}. Raise WAVE_TOTAL_BUDGET_MS if your MCP client allows a longer tool timeout.`,
+    "waveFetch",
+    DEFAULT_TOTAL_BUDGET_MS
   );
+  logger.error(`waveFetch timed out`, {
+    elapsedMs: DEFAULT_TOTAL_BUDGET_MS,
+    traceId,
+  });
+  throw error;
 }
 
 function raiseForGraphQLErrors(payload) {
@@ -995,8 +1143,10 @@ function raiseForGraphQLErrors(payload) {
     );
   }
   if (codes.has("NOT_FOUND")) {
-    throw new WaveError(
-      `Wave could not find the requested record: ${messages}. Check that the ID belongs to the selected business.`
+    throw new WaveNotFoundError(
+      `Wave could not find the requested record: ${messages}. Check that the ID belongs to the selected business.`,
+      "record",
+      errors.map((e) => e.path).join('.') || null
     );
   }
   throw new WaveError(`Wave API error: ${messages}`);
@@ -5793,6 +5943,35 @@ registerResource(
   }
 );
 
+// Health check resource for observability. Probes Wave live on every read, so
+// a degraded API shows up immediately.
+registerResource(
+  "wave://health",
+  "Health check",
+  "Server health status: live Wave API connectivity and current configuration.",
+  async () => {
+    let apiStatus = "healthy";
+    let apiError = null;
+    try {
+      await waveFetch(Q_USER);
+    } catch (error) {
+      apiStatus = "degraded";
+      apiError = sanitizeErrorMessage(error.message);
+    }
+    return jsonText({
+      status: apiStatus,
+      apiError,
+      version: SERVER_VERSION,
+      // process is absent under Cloudflare Workers, where uptime is meaningless.
+      uptimeSeconds: globalThis.process?.uptime ? Math.floor(globalThis.process.uptime()) : null,
+      writesEnabled: writesAllowed(),
+      hasCredentials: !!ACCESS_TOKEN,
+      defaultBusinessId: sessionBusinessId || null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+);
+
   return {
     server,
     // What is actually exposed over MCP right now.
@@ -5834,6 +6013,15 @@ registerResource(
       EXPENSE_SYNONYMS,
       INCOME_SYNONYMS,
       WaveError,
+      WaveAuthError,
+      WaveConfigError,
+      WaveMutationError,
+      WaveValidationError,
+      WaveRateLimitError,
+      WaveNotFoundError,
+      WaveTimeoutError,
+      WaveServerError,
+      WaveNetworkError,
     },
   };
 }
@@ -5863,6 +6051,10 @@ export const __testables = {
   pickRuntimeKeys,
   isDirectRun,
   redactTokens,
+  generateTraceId,
+  makeLogger,
+  // The Wave*Error classes are scoped to createWaveServer and are exposed on
+  // its returned `internals`, not here.
 };
 
 // --- Start ---

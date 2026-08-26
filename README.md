@@ -316,6 +316,8 @@ it.
 | `WAVE_MAX_RESPONSE_BYTES` | No | `8388608` | Reject responses above this size |
 | `WAVE_HTTP_RETRIES` | No | `2` | Retries on 429 and 5xx |
 | `WAVE_DISABLE_AGENT_CONFIG_FALLBACK` | No | off | Read only the environment, not agent config files |
+| `WAVE_LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error`, or `silent`. JSON lines on stderr |
+| `WAVE_TRACING_ENABLED` | No | off | Send a W3C `traceparent` header with each Wave request |
 
 Credentials resolve in order: environment, then the host agent's own config
 file, then `WAVE_ACCESS_TOKEN_FILE`, then 1Password. Reading the agent config

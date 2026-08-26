@@ -608,3 +608,93 @@ test("wave_auth_status returns schema-valid structured content over MCP", async 
     await server.server.close();
   }
 });
+
+// --- Observability: logging and trace context ---
+
+test("logger writes JSON lines to stderr and never to stdout", () => {
+  const { makeLogger } = __testables;
+  const seen = [];
+  const realError = console.error;
+  const realLog = console.log;
+  let stdoutWrites = 0;
+  console.error = (line) => seen.push(line);
+  console.log = () => { stdoutWrites += 1; };
+  try {
+    makeLogger({ service: "t" }).error("boom", { status: 500 });
+  } finally {
+    console.error = realError;
+    console.log = realLog;
+  }
+  assert.equal(stdoutWrites, 0, "stdout carries MCP JSON-RPC and must stay clean");
+  assert.equal(seen.length, 1);
+  const entry = JSON.parse(seen[0]);
+  assert.equal(entry.level, "error");
+  assert.equal(entry.message, "boom");
+  assert.equal(entry.status, 500);
+  assert.equal(entry.service, "t");
+  assert.ok(Date.parse(entry.time), "time is an ISO timestamp");
+});
+
+test("logger honours WAVE_LOG_LEVEL and child bindings merge", () => {
+  const { makeLogger } = __testables;
+  const seen = [];
+  const realError = console.error;
+  console.error = (line) => seen.push(line);
+  try {
+    // Default level is info, so debug is dropped and warn is kept.
+    const log = makeLogger({ a: 1 }).child({ b: 2 });
+    log.debug("dropped");
+    log.warn("kept");
+  } finally {
+    console.error = realError;
+  }
+  assert.equal(seen.length, 1, "debug is below the default info level");
+  const entry = JSON.parse(seen[0]);
+  assert.equal(entry.message, "kept");
+  assert.equal(entry.a, 1);
+  assert.equal(entry.b, 2, "child bindings merge over the parent's");
+});
+
+test("generateTraceId emits a valid W3C traceparent", () => {
+  const { generateTraceId } = __testables;
+  const value = generateTraceId();
+  // version "-" trace-id "-" parent-id "-" trace-flags
+  assert.match(value, /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+  const [, traceId, spanId] = value.split("-");
+  // The spec rejects an all-zero trace-id or parent-id.
+  assert.notEqual(traceId, "0".repeat(32), "trace-id must not be all zeros");
+  assert.notEqual(spanId, "0".repeat(16), "parent-id must not be all zeros");
+  const many = new Set(Array.from({ length: 50 }, () => generateTraceId()));
+  assert.equal(many.size, 50, "trace IDs must be unique per call");
+});
+
+test("no cache tools are registered and reads are not memoized", async () => {
+  let calls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: { user: { id: "u1", defaultEmail: "a@b.c" } } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  const server = createWaveServer({ getAccessToken: async () => "t", hasCredentials: true, writesEnabled: true });
+  const client = new Client({ name: "cache-test", version: "1" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.server.connect(serverTransport), client.connect(clientTransport)]);
+  try {
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    assert.ok(!names.includes("wave_cache_stats"), "cache tooling was removed");
+    assert.ok(!names.includes("wave_cache_clear"), "cache tooling was removed");
+
+    // Two identical reads must both reach the API. A shared cache would leak
+    // one user's data to another in the hosted multi-tenant worker.
+    await client.callTool({ name: "wave_get_user", arguments: {} });
+    await client.callTool({ name: "wave_get_user", arguments: {} });
+    assert.equal(calls, 2, "identical reads must not be served from a cache");
+  } finally {
+    globalThis.fetch = realFetch;
+    await client.close();
+    await server.server.close();
+  }
+});
