@@ -3,6 +3,71 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-08-25 - Improvement pass: security bumps, API-doc accuracy, honest pagination
+
+**Context**: Second pass over the codebase, this time against live sources:
+Wave's published API reference, the MCP specification, and current dependency
+advisories.
+
+**Security**: `fast-uri` 3.0.0-3.1.4 (high, CVE-2026-18446: parser/host
+desync vs WHATWG URL) and `hono` <=4.12.33 (moderate: four middleware
+advisories) were present in both dependency trees as transitives of the MCP
+SDK. The CI gate audits at `--audit-level=high`, so the next push would have
+failed. Lockfiles updated within existing ranges; both trees now report zero
+vulnerabilities (hono 4.13.4, fast-uri 3.1.6).
+
+**Version drift fixed**: the hosted connector's MCP handshake reported
+`REMOTE_SERVER_INFO.version` "1.0.0" forever while the package moved to 1.0.2.
+`sync:plugin` now rewrites it alongside SERVER_VERSION, and `release:check`
+fails when they disagree (negative-tested by hand). It now reports 1.0.2.
+
+**API accuracy**, each sourced from Wave's live schema reference:
+
+- Dropped `Money.raw` from MoneyFields: Wave deprecated it because it can
+  overflow; `minorUnitValue` was already selected and nothing read `.raw`.
+- Dropped `InvoiceItem.price` from InvoiceFields: deprecated in favor of
+  `unitPrice`, which the detail views already use.
+- Corrected `wave_list_invoices`'s `invoice_number` description: Wave applies
+  a substring match ("12" matches 112 and 120), not an exact match.
+- Noted on all three money-transaction tools that Wave marks them BETA and
+  they require classic accounting to be disabled.
+- Noted on `wave_create_deposit_transaction` that Wave has deprecated its
+  underlying mutation ("not available for public use at this time") and that
+  split-line money transactions are the preferred shape going forward.
+
+**Honest pagination**: a fetch_all walk stopped by the 500-page safety
+ceiling used to report `fetched_all: true`, rendering "Returned all N
+record(s)" for a list that could be incomplete. walkPages now returns
+`truncated: true`, `fetched_all` is only true for complete sweeps, and the
+markdown footer warns and points at page-by-page retrieval instead.
+
+**Worker robustness**: `fetchWaveUser` now turns a non-JSON identity response
+(an HTML error page from an outage or proxy) into a clear message carrying
+the HTTP status, instead of a bare SyntaxError mid-OAuth-flow.
+
+**Verification**: 66 of 66 root tests pass (four new), 40 of 40 Worker tests
+pass (one new), smoke:list-tools unchanged at 30 read-only / 74 write tools,
+and all 64 GraphQL documents validate against the live Wave schema via
+smoke:schema -- the direct proof that dropping the two deprecated fields is
+safe today.
+
+**Deferred deliberately**:
+
+- `agents` 0.17.4 -> 0.21.0 and `workers-oauth-provider` 0.8.1 -> 0.10.3.
+  The oauth-provider changelog between those versions changes live OAuth
+  behavior (strict RFC 8707 resource policy, CIMD fetch errors, PKCE
+  defaults aligned to MCP 2026-07-28) and needs a deploy plus a real
+  end-to-end authorization flow to verify safely. Worth doing soon; not doable
+  blind in a code-only pass.
+- MCP structured tool output (`outputSchema`/`structuredContent`, spec
+  2025-06-18): a poor fit while every tool offers a markdown/json dual
+  format; revisiting would mean one schema per tool.
+- The `/delete` page trusts anyone who can fetch their own CSRF token, so it
+  remains an unauthenticated user-wide revoke by design. Documented trade-off;
+  changing it means deciding what binds the form to the owner.
+
+---
+
 ## 2026-08-25 - Comprehensive bug-fixing pass: five defects, four in the shared server
 
 **Context**: A full read-through of `index.js` (5,845 lines) and every module

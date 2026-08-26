@@ -239,7 +239,14 @@ export async function fetchWaveUser(accessToken) {
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query: "query { user { id defaultEmail firstName lastName } }" }),
   });
-  const payload = await response.json();
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    // A non-JSON body (an HTML error page from a proxy, say) would otherwise
+    // surface as a bare SyntaxError with no hint about where it came from.
+    throw new Error(`Wave returned a non-JSON response (HTTP ${response.status}) while identifying the user.`);
+  }
   const user = payload?.data?.user;
   if (!user?.id) {
     throw new Error("Could not identify the Wave user for this token.");

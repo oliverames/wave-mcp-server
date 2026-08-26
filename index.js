@@ -337,9 +337,9 @@ function detectAgent() {
 // One selection set per entity, so a field is spelled correctly once rather
 // than once per query, and every tool's output shape stays consistent.
 //
-// Money is always selected in full: `value` is the display string, while
-// `raw` and `minorUnitValue` give the amount in minor units for arithmetic
-// that must stay exact.
+// Money is always selected in full: `value` is the display string, and
+// `minorUnitValue` gives the amount in minor units for arithmetic that must
+// stay exact. `raw` was dropped: Wave deprecated it because it can overflow.
 
 const FRAGMENTS = {
   pageInfo: `
@@ -351,7 +351,6 @@ fragment PageInfoFields on OffsetPageInfo {
 
   money: `
 fragment MoneyFields on Money {
-  raw
   minorUnitValue
   value
   currency { code symbol }
@@ -582,7 +581,6 @@ fragment InvoiceFields on Invoice {
     id
     description
     quantity
-    price
     unitPrice
     account { id name }
     product { id name }
@@ -1023,13 +1021,21 @@ async function waveMutate(query, variables, rootField) {
  * Fetch one page, or every page, of an offset-paginated connection.
  *
  * `pathKeys` locates the connection in the response, e.g. ["business", "invoices"].
+ * A fetchAll walk that stops at the safety ceiling reports truncated: true
+ * rather than claiming completeness.
  */
-async function walkPages(query, variables, pathKeys, { page = 1, pageSize = DEFAULT_PAGE_SIZE, fetchAll = false } = {}) {
+async function walkPages(
+  query,
+  variables,
+  pathKeys,
+  { page = 1, pageSize = DEFAULT_PAGE_SIZE, fetchAll = false, maxPages = MAX_PAGES } = {}
+) {
   const size = Math.max(1, Math.min(pageSize, MAX_PAGE_SIZE));
   const items = [];
   let current = page;
   let pageInfo = {};
   let walked = 0;
+  let truncated = false;
 
   for (;;) {
     const data = await waveFetch(query, { ...variables, page: current, pageSize: size });
@@ -1047,7 +1053,11 @@ async function walkPages(query, variables, pathKeys, { page = 1, pageSize = DEFA
     walked += 1;
 
     const totalPages = pageInfo.totalPages || 1;
-    if (!fetchAll || current >= totalPages || walked >= MAX_PAGES) break;
+    if (!fetchAll || current >= totalPages) break;
+    if (walked >= maxPages) {
+      truncated = true;
+      break;
+    }
     current += 1;
   }
 
@@ -1063,7 +1073,8 @@ async function walkPages(query, variables, pathKeys, { page = 1, pageSize = DEFA
     total_pages: totalPages,
     has_more: hasMore,
     next_page: hasMore ? current + 1 : null,
-    fetched_all: fetchAll,
+    fetched_all: fetchAll && !truncated,
+    truncated,
   };
 }
 
@@ -1170,6 +1181,12 @@ function table(rows, columns) {
 
 /** Describe where the caller is in a paginated set, and how to advance. */
 function paginationFooter(result) {
+  if (result.truncated) {
+    return (
+      `\n_Warning: stopped at the ${MAX_PAGES}-page safety ceiling after collecting ${result.count} record(s); ` +
+      "the list may be incomplete. Page through with `page=N` instead of fetch_all._"
+    );
+  }
   if (result.fetched_all) return `\n_Returned all ${result.count} record(s)._`;
   const totalPages = result.total_pages || 1;
   let line = `\n_Page ${result.page} of ${totalPages} - showing ${result.count}`;
@@ -3518,7 +3535,7 @@ registerTool(
         .describe("DRAFT, SAVED, UNPAID, SENT, VIEWED, PARTIAL, PAID, OVERDUE, OVERPAID."),
       customer_id: z.string().optional().describe("Only invoices for this customer."),
       currency: z.string().optional().describe('Currency code, e.g. "USD".'),
-      invoice_number: z.string().optional().describe("Exact invoice number match."),
+      invoice_number: z.string().optional().describe("Substring match applied by Wave: 12 also matches 112 and 120."),
       amount_due: z.string().optional().describe('Exact outstanding amount match, e.g. "250.00".'),
       invoice_date_start: z.string().optional().describe("Earliest invoice date, YYYY-MM-DD."),
       invoice_date_end: z.string().optional().describe("Latest invoice date, YYYY-MM-DD."),
@@ -5101,7 +5118,7 @@ registerWriteTool(
   "wave_create_money_transaction",
   {
     description:
-      "Record a bookkeeping transaction: an expense, income, or transfer. Wave is double-entry, so a transaction has two sides. The anchor is the bank account or credit card the money moved through, with direction WITHDRAWAL for money out or DEPOSIT for money in. The line items are the categories it is attributed to, and their amounts must total the anchor amount. A $50 office-supplies expense paid from checking is one anchor (checking, WITHDRAWAL, 50.00) and one line item (Office Supplies, 50.00). Splits just add line items.",
+      "Record a bookkeeping transaction: an expense, income, or transfer. Wave is double-entry, so a transaction has two sides. The anchor is the bank account or credit card the money moved through, with direction WITHDRAWAL for money out or DEPOSIT for money in. The line items are the categories it is attributed to, and their amounts must total the anchor amount. A $50 office-supplies expense paid from checking is one anchor (checking, WITHDRAWAL, 50.00) and one line item (Office Supplies, 50.00). Splits just add line items. Wave marks this mutation BETA: it requires a business with classic accounting disabled.",
     inputSchema: {
       anchor_account_id: z.string().describe("Bank or credit card account the money moved through."),
       direction: z.string().describe("WITHDRAWAL for money out, DEPOSIT for money in."),
@@ -5153,7 +5170,7 @@ registerWriteTool(
   "wave_create_money_transactions",
   {
     description:
-      "Record several bookkeeping transactions in one call. Wave applies the batch atomically: if one transaction is rejected, none are recorded. Use this for bulk import rather than looping over wave_create_money_transaction.",
+      "Record several bookkeeping transactions in one call. Wave applies the batch atomically: if one transaction is rejected, none are recorded. Use this for bulk import rather than looping over wave_create_money_transaction. Wave marks this mutation BETA: it requires a business with classic accounting disabled.",
     inputSchema: {
       transactions: z
         .array(
@@ -5232,7 +5249,7 @@ registerWriteTool(
   "wave_create_deposit_transaction",
   {
     description:
-      "Record a deposit whose net differs from its gross because of fees. This is the shape of a payment-processor payout: the customer paid $100, the processor kept $3, and $97 reached the bank. deposit_amount is the $97 that landed, line items carry the $100 of income, and fees carry the $3, so gross and net both stay correct.",
+      "Record a deposit whose net differs from its gross because of fees. This is the shape of a payment-processor payout: the customer paid $100, the processor kept $3, and $97 reached the bank. deposit_amount is the $97 that landed, line items carry the $100 of income, and fees carry the $3, so gross and net both stay correct. Wave has deprecated the underlying mutation and documents it as not for public use; it still responds today, but prefer wave_create_money_transaction with split line items plus a fees expense line for new work, and move over if this starts failing.",
     inputSchema: {
       deposit_account_id: z.string().describe("Bank account the net amount landed in."),
       deposit_amount: z.string().describe("Net amount deposited, after fees."),
@@ -5780,6 +5797,7 @@ registerResource(
       assertWaveApiUrl,
       requireBusinessId,
       waveFetch,
+      walkPages,
       EXPENSE_SYNONYMS,
       INCOME_SYNONYMS,
       WaveError,

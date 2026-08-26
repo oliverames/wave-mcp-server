@@ -78,7 +78,14 @@ if (declared !== version) {
   problems.push(`index.js: SERVER_VERSION ${declared} != package.json ${version}`);
 }
 
-// 5. Files listed for publish actually exist.
+// 5. The hosted connector's handshake version matches too.
+const brandAssets = fs.readFileSync(path.join(projectRoot, "worker", "src", "brand-assets.js"), "utf8");
+const remoteVersion = brandAssets.match(/REMOTE_SERVER_INFO = \{\s*name: "wave_mcp",\s*version: "([^"]*)"/)?.[1];
+if (remoteVersion !== version) {
+  problems.push(`worker/src/brand-assets.js: REMOTE_SERVER_INFO version ${remoteVersion} != package.json ${version}`);
+}
+
+// 6. Files listed for publish actually exist.
 for (const entry of packageJson.files ?? []) {
   const target = path.join(projectRoot, entry.replace(/\/$/, ""));
   if (!fs.existsSync(target)) {

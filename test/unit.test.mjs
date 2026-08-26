@@ -434,6 +434,14 @@ test("Money is always selected with an exact minor-unit value", () => {
   assert.match(__testables.FRAGMENTS.money, /minorUnitValue/);
 });
 
+test("fields Wave deprecates stay out of the fragments", () => {
+  // Wave deprecated Money.raw because it can overflow, and
+  // InvoiceItem.price in favor of unitPrice.
+  assert.doesNotMatch(__testables.FRAGMENTS.money, /\braw\b/);
+  assert.doesNotMatch(__testables.FRAGMENTS.invoice, /\bprice\b/);
+  assert.match(__testables.FRAGMENTS.invoice, /unitPrice/);
+});
+
 // --- Autostart detection ---------------------------------------------------
 // npm installs the bin as a relative symlink, so a naive
 // `import.meta.url === "file://" + process.argv[1]` comparison fails and the
@@ -519,4 +527,56 @@ test("a malformed JSON body becomes a WaveError, not a bare SyntaxError", async 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("a fetch_all sweep that hits the safety ceiling reports truncation honestly", async () => {
+  // Used to claim "Returned all N record(s)" even when the page ceiling cut
+  // the walk short.
+  const originalFetch = globalThis.fetch;
+  const pages = {
+    1: { edges: [{ node: { id: "a" } }, { node: { id: "b" } }], pageInfo: { totalPages: 5, totalCount: 9 } },
+    2: { edges: [{ node: { id: "c" } }, { node: { id: "d" } }], pageInfo: { totalPages: 5, totalCount: 9 } },
+    3: { edges: [{ node: { id: "e" } }], pageInfo: { totalPages: 5, totalCount: 9 } },
+  };
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: { business: { accounts: pages[calls] } } }), { status: 200 });
+  };
+  try {
+    const result = await H.walkPages("query CeilingProbe { x }", {}, ["business", "accounts"], {
+      pageSize: 2,
+      fetchAll: true,
+      maxPages: 3,
+    });
+    assert.equal(calls, 3);
+    assert.equal(result.count, 5);
+    assert.equal(result.truncated, true);
+    assert.equal(result.fetched_all, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a fetch_all sweep that finishes reports completeness as before", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        data: { business: { accounts: { edges: [{ node: { id: "a" } }], pageInfo: { totalPages: 1, totalCount: 1 } } } },
+      }),
+      { status: 200 }
+    );
+  try {
+    const result = await H.walkPages("query CompleteProbe { x }", {}, ["business", "accounts"], { fetchAll: true });
+    assert.equal(result.truncated, false);
+    assert.equal(result.fetched_all, true);
+    assert.match(H.paginationFooter(result), /Returned all 1 record/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("pagination footer warns when a sweep was cut short by the ceiling", () => {
+  assert.match(H.paginationFooter({ truncated: true, count: 1000 }), /may be incomplete/);
 });

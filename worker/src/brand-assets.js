@@ -15,7 +15,7 @@ export const CONNECTOR_ICON_URL = `${CONNECTOR_ORIGIN}/assets/wave-icon-v1.png`;
 
 export const REMOTE_SERVER_INFO = {
   name: "wave_mcp",
-  version: "1.0.0",
+  version: "1.0.2",
   title: CONNECTOR_NAME,
   icons: [
     { src: CONNECTOR_ICON_URL, mimeType: "image/png", sizes: ["256x256"] },

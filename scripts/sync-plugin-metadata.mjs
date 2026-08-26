@@ -80,6 +80,19 @@ function updateSourceVersion() {
   const source = fs.readFileSync(indexPath, "utf8");
   const updated = source.replace(/const SERVER_VERSION = "[^"]*";/, `const SERVER_VERSION = "${version}";`);
   if (updated !== source) fs.writeFileSync(indexPath, updated);
+
+  // The hosted connector reports its own serverInfo during the MCP handshake;
+  // a stale value makes clients advertise a version that was never released.
+  const brandAssetsPath = path.join(projectRoot, "worker", "src", "brand-assets.js");
+  const brandAssets = fs.readFileSync(brandAssetsPath, "utf8");
+  const updatedBrandAssets = brandAssets.replace(
+    /(export const REMOTE_SERVER_INFO = \{\s*name: "wave_mcp",\s*version: ")[^"]*(")/,
+    `$1${version}$2`
+  );
+  if (updatedBrandAssets === brandAssets) {
+    throw new Error(`Could not update REMOTE_SERVER_INFO in ${brandAssetsPath}; expected its version literal.`);
+  }
+  fs.writeFileSync(brandAssetsPath, updatedBrandAssets);
 }
 
 function readJson(relativePath) {

@@ -24,6 +24,7 @@ import {
   buildWaveAuthorizeUrl,
   base64url,
   isAllowedWaveUser,
+  fetchWaveUser,
 } from "../src/wave-oauth.js";
 import { layout, messagePage, consentPage } from "../src/pages.js";
 import { WaveHandler } from "../src/wave-handler.js";
@@ -206,6 +207,17 @@ test("expires_in is converted to an absolute instant", () => {
   const record = toTokenRecord({ access_token: "a", refresh_token: "r", expires_in: 3600 }, { writesEnabled: false });
   assert.ok(record.expires_at >= before + 3600 * 1000);
   assert.equal(record.writes_enabled, false);
+});
+
+test("a non-JSON identity response is reported clearly instead of as a SyntaxError", async () => {
+  // A proxy or outage can answer the user-identity call with an HTML page.
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("<html>gateway error</html>", { status: 502 });
+  try {
+    await assert.rejects(() => fetchWaveUser("token"), /non-JSON response \(HTTP 502\)/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 // --- Signing ----------------------------------------------------------------
