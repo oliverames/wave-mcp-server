@@ -12,7 +12,7 @@
   <code>74 tools</code> &bull;
   <code>42/42 mutations</code> &bull;
   <code>11/11 queries</code> &bull;
-  <code>7 resources</code>
+  <code>8 resources</code>
 </p>
 
 <p align="center">
@@ -283,7 +283,7 @@ through a tool, so hosts that ignore resources lose nothing.
 
 `wave://businesses` &bull; `wave://accounts` &bull; `wave://customers` &bull;
 `wave://vendors` &bull; `wave://products` &bull; `wave://sales-taxes` &bull;
-`wave://account-taxonomy`
+`wave://account-taxonomy` &bull; `wave://health`
 
 ## How Transactions Work
 
@@ -384,7 +384,7 @@ See [worker/README.md](worker/README.md) for setup and the security model.
 ## Architecture
 
 ```
-index.js                     Single-file server: client, 74 tools, 7 resources
+index.js                     Single-file server: client, 74 tools, 8 resources
   createWaveServer()         Factory over injected credentials, shared by
                              the stdio process and the hosted Worker
 scripts/

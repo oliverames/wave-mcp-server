@@ -3,6 +3,95 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-08-26 - Reviewed and repaired the 1.0.3 observability work; response cache removed
+
+**Context**: A second agent had produced an uncommitted 1.0.3 branch adding a
+response cache, pino logging, granular error types, a health resource, and
+trace-context propagation. This session reviewed it, then fixed it on Oliver's
+instruction to rip out the cache and repair the rest. Note the file was being
+edited concurrently while the review ran, so the review is pinned to the
+index.js snapshot at 16:39:12 (md5 0717db3c). A rescan after the other agent
+finished found it had installed pino and written a CHANGELOG but changed no
+code.
+
+**What changed**: Seventeen findings, eight blocking. The full review, the
+rescan, and a resolution table are in
+`docs/reviews/2026-08-26-uncommitted-observability-cache-review.md`.
+
+**The cache was removed, not repaired**. It keyed on the GraphQL document and
+its variables with no tenant identity in the key, while `worker/src/wave-mcp.js`
+calls `createWaveServer` once per Wave user against a module-level singleton.
+Two users sharing an isolate could therefore read each other's accounting data,
+and queries carrying no distinguishing variables (`wave_list_businesses`,
+`Q_USER`) collided immediately. Nothing invalidated on writes either, so a
+freshly created invoice would not appear in a subsequent list for the full 60s
+TTL. Both cache tools went with it, restoring the 74-tool count.
+
+**pino replaced with a dependency-free stderr logger**. pino defaults to
+stdout, which is the MCP stdio JSON-RPC channel, and `waveFetch` logged on
+every request, so each Wave call would have corrupted the protocol stream. pino
+also cannot run under `nodejs_compat` in the worker and was constructed outside
+the `IS_CLOUDFLARE_WORKERS` guard. It was additionally passed a numeric `level`
+where it expects a level name. The replacement writes JSON lines to stderr and
+now sits below the `SERVER_VERSION` declaration it reads, fixing an import-time
+TDZ `ReferenceError` that had been failing the entire test suite.
+
+**Trace IDs were always all-zeros**: `generateTraceId` allocated a Uint8Array
+and never called `getRandomValues`, and the W3C spec rejects an all-zero
+trace-id. Both trace-id and parent-id now come from the CSPRNG.
+
+**One further defect found while fixing**: the same diff added the `Wave*Error`
+classes to the module-level `__testables` export, but those classes are declared
+inside `createWaveServer`. That is an unconditional `ReferenceError` at import,
+visible only once the pino failure stopped masking it. They remain on the
+`internals` object `createWaveServer` returns, where `WaveError` already was.
+
+**Decisions made**: Caching is not categorically rejected, but it may only
+return scoped to reference data (accounts, currencies, countries, account
+types), keyed per identity, and held inside `createWaveServer` rather than at
+module scope. Transactional reads should not be cached in an accounting server
+at all. The `src/` TypeScript scaffolding and `tsconfig.json` were trashed
+rather than fixed: nothing imported them, `src/types/index.ts` had a broken
+relative path, there is no typescript dependency or tsc script, and the
+tsconfig repeated nine options and included `noUnusedVariables`, which is not a
+compiler option. A TypeScript migration should start deliberately.
+
+**Documentation**: CHANGELOG.md was rewritten. The version the other agent
+wrote claimed "Fixed: Cache invalidation on mutations" when `invalidate` had
+zero call sites, described caching as scoped to reference data when no
+allowlist existed, and advertised W3C trace propagation that emitted an invalid
+header. The removed cache is now recorded under Notes with the reason. README
+gained the two new env vars and had its resource count corrected from 7 to 8,
+which `wave://health` had silently invalidated.
+
+**Verification**: 71 root tests (four new: stderr-only logging, level filtering
+with child bindings, traceparent validity, and that identical reads still both
+reach the API), 44 worker tests, smoke:list-tools (8 resources, 30 read-only,
+74 with writes), smoke:schema 64/64, smoke:packed responding over stdio at
+1.0.3, and release:check clean after `npm run sync:plugin` resolved nine
+version mismatches.
+
+**Left off at**: Clean tree, `main` in sync with origin at 68df253. Nothing in
+flight.
+
+**Open questions**:
+
+- NEW: another agent may still hold this branch checked out. If it resumes from
+  its own state it will reintroduce the cache. Worth telling it the work landed.
+- NEW: `wave://health` probes Wave on every read with no rate limiting of its
+  own. Harmless for a human-paced client, but a host that polls resources
+  aggressively would burn Wave's roughly two-concurrent-request budget. Left
+  alone pending evidence that any host does this.
+- Still open, carried from the entry below: production deploy is blocked with
+  no Workers-deploy credential on this machine. To ship, run `wrangler login`,
+  or add a Cloudflare API token with Workers deploy permissions to 1Password
+  and map it in `~/.claude/.env`. Then re-run both wrangler-dev probe suites
+  against the live host and complete one real Wave authorization. Rollback is
+  `npx wrangler rollback` in `worker/`. This now gates shipping 1.0.3, not just
+  the prior pass.
+
+---
+
 ## 2026-08-26 - Deferred items cleared: worker stack upgraded, structured output, delete hardening
 
 **Context**: The 2026-08-25 pass deferred three items. All three are now done
