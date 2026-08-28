@@ -29,7 +29,7 @@ import { z } from "zod";
 // import-time config resolution and the stdio autostart are both skipped.
 const IS_CLOUDFLARE_WORKERS = globalThis.navigator?.userAgent === "Cloudflare-Workers";
 
-const SERVER_VERSION = "1.0.3";
+const SERVER_VERSION = "1.0.4";
 
 // --- Structured Logging ---
 // JSON lines on stderr. stdout carries the MCP stdio JSON-RPC stream, so
