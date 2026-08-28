@@ -1,6 +1,6 @@
 {
   "name": "@oliverames/mcp-server-for-wave",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Local MCP server for Wave Accounting: invoices, estimates, customers, products, taxes, and bookkeeping",
   "license": "MIT",
   "repository": {
