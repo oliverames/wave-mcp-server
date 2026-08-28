@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-08-27
+
+### Fixed
+
+- Corrected the resource count stated in the README.
+
+### Changed
+
+- Tagged release restoring agreement between the git tag, `package.json`, and
+  the published npm version. 1.0.3 reached npm without a matching tag, so no
+  GitHub release existed for it.
+
 ## [1.0.3] - 2026-08-26
 
 ### Added
