@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-08-27
+
+### Fixed
+
+- Trace-id generation no longer assumes `globalThis.crypto`. The package
+  supports node >=18, where that global is not exposed by default, so
+  `randomHex` threw "Cannot read properties of undefined (reading
+  'getRandomValues')" and every traced request failed on Node 18. It now falls
+  back to the `node:crypto` WebCrypto instance.
+
 ## [1.0.5] - 2026-08-27
 
 ### Fixed

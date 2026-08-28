@@ -14,6 +14,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { webcrypto } from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -95,9 +96,14 @@ const WAVE_RUNTIME_KEYS = [
 const TRACING_ENABLED = truthyFlag(globalThis.process?.env?.WAVE_TRACING_ENABLED);
 const TRACE_ID_HEADER = "traceparent";
 
+// package.json supports node >=18, where globalThis.crypto is not exposed by
+// default. Fall back to the node:crypto WebCrypto instance, which offers the
+// same CSPRNG on every supported release.
+const webCrypto = globalThis.crypto ?? webcrypto;
+
 function randomHex(byteLength) {
   const bytes = new Uint8Array(byteLength);
-  globalThis.crypto.getRandomValues(bytes);
+  webCrypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -1517,8 +1523,8 @@ function externalId(prefix, supplied) {
   // an id and Wave would silently drop the second as a duplicate.
   const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
   let random = "";
-  if (globalThis.crypto?.getRandomValues) {
-    random = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(4)), (byte) =>
+  if (webCrypto?.getRandomValues) {
+    random = Array.from(webCrypto.getRandomValues(new Uint8Array(4)), (byte) =>
       byte.toString(36).padStart(2, "0")
     ).join("");
   }
