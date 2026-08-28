@@ -3,6 +3,39 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-08-27 - Released 1.0.5 and 1.0.6; fixed the version hook and a Node 18 crash
+
+**What changed**: npm already carried 1.0.3 with no matching git tag, so the
+repo, the tag, and the registry disagreed. Cutting 1.0.4 exposed the cause: the
+npm `version` hook's `git add` list omitted `worker/src/brand-assets.js`, so
+`sync:plugin` wrote the new hosted `REMOTE_SERVER_INFO` version into the working
+tree while the release commit and tag went out without it. CI failed
+release:check:registry after v1.0.4 was already pushed. Commit `5a5886c` adds
+the file to the hook. 1.0.5 carried the content forward.
+
+1.0.6 then fixed a real defect: `randomHex` called
+`globalThis.crypto.getRandomValues` unguarded while `engines` declares
+`node >=18`, where that global is not exposed. Every traced request threw
+"Cannot read properties of undefined (reading 'getRandomValues')", and the CI
+matrix had been red on its 18.x leg. It now falls back to `node:crypto`'s
+WebCrypto instance. Line 1520 had already guarded correctly; line 100 had not.
+
+**Decisions made**: Carried forward to 1.0.5 rather than moving the pushed
+v1.0.4 tag. Remote tag deletion is destructive and the additive path cost only a
+version number.
+
+**Verification**: 71 tests pass. `release:check` reports consistency for each
+version. The Node 18 fallback was verified by deleting `globalThis.crypto` and
+confirming the module still imports. npm latest is 1.0.6 and both GitHub
+releases exist.
+
+**Left off at**: Released and clean at 1.0.6.
+
+**Open questions**: v1.0.4 remains as a tag that published nothing. Harmless,
+but worth deleting if the dangling tag is confusing. NEW.
+
+---
+
 ## 2026-08-26 - Reviewed and repaired the 1.0.3 observability work; response cache removed
 
 **Context**: A second agent had produced an uncommitted 1.0.3 branch adding a
