@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-09-02
+
+### Fixed
+
+- Account reads no longer fail with "Cannot return null for non-nullable field
+  AccountSubtype.archivable". Wave began returning null for `archivable` on
+  some account subtypes while the schema still declares it non-nullable, so
+  GraphQL discarded the entire response and no account or balance could be
+  read. The `AccountFields` fragment now selects only `subtype { name value }`,
+  the two fields the account tools render. `wave_list_account_subtypes` still
+  reads both `archivable` and `systemCreated` from its own query.
+
 ## [1.0.6] - 2026-08-27
 
 ### Fixed
