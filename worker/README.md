@@ -142,6 +142,21 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 Expect `401`, three headers, and `403`.
 
+Those probes prove the Worker is up, not that the new code is in it. Two
+things can mislead you here, both seen on 2026-09-02:
+
+- `wrangler deploy` in a non-interactive shell with no `CLOUDFLARE_API_TOKEN`
+  stops at login, and an earlier session's "redeploy" turned out to be a
+  `--dry-run`. Look for `Uploaded wave-mcp-connector` and a version ID in the
+  output; nothing short of that is a deploy.
+- The Worker's `modified_on` in the Cloudflare API and dashboard does not
+  track deployments. It stayed at 2026-07-30 across real deploys.
+
+To confirm the bundle changed, fetch the deployed script (the Cloudflare MCP
+`workers_get_worker_code` tool, or `wrangler` with a token) and grep it for
+the string your change introduced, for example the `REMOTE_SERVER_INFO`
+version or a GraphQL fragment.
+
 ## Not affiliated with Wave
 
 An independent connector. Wave Financial Inc. owns the Wave name and marks.
