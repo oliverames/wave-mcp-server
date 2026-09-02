@@ -431,7 +431,7 @@ fragment AccountFields on Account {
   normalBalanceType
   currency { code symbol }
   type { name value normalBalanceType }
-  subtype { name value archivable systemCreated }
+  subtype { name value }
 }`,
 
   customer: `
