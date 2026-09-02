@@ -26,16 +26,19 @@ match 1.0.5 and 1.0.6 before pushing.
 
 **Verification**: 71 root tests and 44 worker tests pass; `smoke:schema`
 validates 64/64 documents; `release:check` passes at 1.0.7. The failure was
-reproduced on the hosted connector before the fix. The fix is NOT yet verified
-live: the local server has no valid token, and the Worker deploy from this
-session was blocked by the tool permission classifier.
+reproduced on the hosted connector before the fix. Verified live at 14:26 EDT
+after Oliver deployed the Worker from an interactive shell: wave_list_accounts
+filtered to ASSET returned all 14 accounts, including the Owner Payment
+Clearing balance, where the same call had failed minutes earlier. The first two
+deploy attempts never uploaded (wrangler needed an OAuth login), which the
+Cloudflare bundle confirmed: it still carried the old fragment and version
+1.0.0 until the third attempt.
 
 **Left off at**: v1.0.7 is tagged and pushed, but the Release workflow failed
 at `npm publish` with a 404 on PUT, which is npm's response to an invalid
 token. The 1Password "npm Publish Token" also returns 401 to `npm whoami`, so
 the `NPM_TOKEN` repository secret needs a fresh granular token, then
-`gh run rerun 33648390679`. The Worker still needs `npm run deploy` in
-`worker/`, followed by a `wave_list_accounts` call filtered to ASSET.
+`gh run rerun 33648390679`. The Worker is deployed and verified.
 
 **Open questions**: The dangling local v1.0.4 tag went to the remote with this
 push and its Release run failed at the registry check, as expected. Delete
