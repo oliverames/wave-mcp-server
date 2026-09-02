@@ -3,6 +3,46 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-09-02 - Released 1.0.7 for the AccountSubtype.archivable null; schema coverage audit
+
+**What changed**: Every account read through the hosted connector failed with
+"Cannot return null for non-nullable field AccountSubtype.archivable", once per
+account. Wave began returning null for `archivable` on some subtypes while the
+schema still declares it `Boolean!`, so GraphQL discarded the whole response.
+The `AccountFields` fragment now selects `subtype { name value }` only; the
+account tools never rendered the other two fields. `Q_ACCOUNT_SUBTYPES` keeps
+both, and `wave_list_account_subtypes` still returned them without error today.
+Handed off from a Cowork session that could not push.
+
+Also audited the server against the live schema by unauthenticated
+introspection. Operation coverage is complete: every Query root field, Business
+sub-query, and mutation has a tool. See
+`docs/reviews/2026-09-02-wave-schema-coverage-audit.md` for the small
+field-level gaps.
+
+**Decisions made**: Dropped the field rather than tolerating the null, because
+nothing rendered it. Retitled the `npm version` commit to "Release 1.0.7" to
+match 1.0.5 and 1.0.6 before pushing.
+
+**Verification**: 71 root tests and 44 worker tests pass; `smoke:schema`
+validates 64/64 documents; `release:check` passes at 1.0.7. The failure was
+reproduced on the hosted connector before the fix. The fix is NOT yet verified
+live: the local server has no valid token, and the Worker deploy from this
+session was blocked by the tool permission classifier.
+
+**Left off at**: v1.0.7 is tagged and pushed, but the Release workflow failed
+at `npm publish` with a 404 on PUT, which is npm's response to an invalid
+token. The 1Password "npm Publish Token" also returns 401 to `npm whoami`, so
+the `NPM_TOKEN` repository secret needs a fresh granular token, then
+`gh run rerun 33648390679`. The Worker still needs `npm run deploy` in
+`worker/`, followed by a `wave_list_accounts` call filtered to ASSET.
+
+**Open questions**: The dangling local v1.0.4 tag went to the remote with this
+push and its Release run failed at the registry check, as expected. Delete
+`v1.0.4` on the remote or leave it; nothing depends on it. NEW.
+
+---
+
 ## 2026-08-27 - Released 1.0.5 and 1.0.6; fixed the version hook and a Node 18 crash
 
 **What changed**: npm already carried 1.0.3 with no matching git tag, so the
