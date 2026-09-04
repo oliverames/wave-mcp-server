@@ -1,0 +1,15 @@
+[mcp_servers.wave-mcp-server]
+command = "npx"
+args = [
+    "-y",
+    "@oliverames/mcp-server-for-wave@latest",
+]
+env_vars = [
+    "WAVE_ACCESS_TOKEN",
+    "WAVE_BUSINESS_ID",
+    "WAVE_OP_PATH",
+    "OP_SERVICE_ACCOUNT_TOKEN",
+]
+
+[mcp_servers.wave-mcp-server.env]
+WAVE_ALLOW_WRITES = "1"
