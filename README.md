@@ -95,12 +95,7 @@ so expect to refresh it periodically, or use the
 
 ### Install as a plugin
 
-The repo doubles as a single-plugin marketplace for hosts that support them:
-
-```bash
-/plugin marketplace add oliverames/wave-mcp-server
-/plugin install wave-mcp-server
-```
+Claude and Codex plugin packages remain in this repository for distribution through a separately managed marketplace. The repository no longer supplies root catalogs that appear automatically when the project opens. For direct use, register the MCP server as shown below.
 
 ### Install in Codex
 

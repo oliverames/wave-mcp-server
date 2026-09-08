@@ -38,8 +38,6 @@ for (const manifestPath of [
 
 // 2. Marketplace entries carry the package version.
 for (const marketplacePath of [
-  ".claude-plugin/marketplace.json",
-  ".agents/plugins/marketplace.json",
   ".hermes-plugin/marketplace.json",
   ".antigravity-plugin/marketplace.json",
 ]) {
