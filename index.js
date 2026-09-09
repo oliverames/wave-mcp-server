@@ -657,6 +657,7 @@ fragment EstimateFields on AREstimate {
   estimateDate
   dueDate
   memo
+  dontCarryOverNotesToInvoice
   footer
   pdfUrl
   viewUrl
@@ -3472,6 +3473,7 @@ query ListInvoices(
   $sort: [InvoiceSort!]!
   $status: InvoiceStatus
   $customerId: ID
+  $sourceId: ID
   $currency: CurrencyCode
   $invoiceDateStart: Date
   $invoiceDateEnd: Date
@@ -3488,6 +3490,7 @@ query ListInvoices(
       sort: $sort
       status: $status
       customerId: $customerId
+      sourceId: $sourceId
       currency: $currency
       invoiceDateStart: $invoiceDateStart
       invoiceDateEnd: $invoiceDateEnd
@@ -3722,6 +3725,7 @@ registerTool(
         .optional()
         .describe("DRAFT, SAVED, UNPAID, SENT, VIEWED, PARTIAL, PAID, OVERDUE, OVERPAID."),
       customer_id: z.string().optional().describe("Only invoices for this customer."),
+      source_id: z.string().optional().describe("Only invoices created from this source, such as an estimate ID."),
       currency: z.string().optional().describe('Currency code, e.g. "USD".'),
       invoice_number: z.string().optional().describe("Substring match applied by Wave: 12 also matches 112 and 120."),
       amount_due: z.string().optional().describe('Exact outstanding amount match, e.g. "250.00".'),
@@ -3745,6 +3749,7 @@ registerTool(
         sort: args.sort?.map((s) => s.toUpperCase()) ?? ["INVOICE_DATE_DESC"],
         status: args.status?.toUpperCase(),
         customerId: args.customer_id,
+        sourceId: args.source_id,
         currency: args.currency?.toUpperCase(),
         invoiceNumber: args.invoice_number,
         amountDue: decimalStr(args.amount_due),
@@ -4527,6 +4532,7 @@ function estimateDetail(estimate) {
       ["Deposit total", money(estimate.depositTotal)],
       ["Deposit payment status", estimate.depositPaymentStatus],
       ["Memo", estimate.memo],
+      ["Prevent notes carrying to invoice", estimate.dontCarryOverNotesToInvoice],
       ["Footer", estimate.footer],
       ["Last sent", estimate.lastSentAt],
       ["Last sent via", estimate.lastSentVia],
@@ -4690,6 +4696,7 @@ registerWriteTool(
       exchange_rate: z.string().optional().describe("Rate to the business currency."),
       memo: z.string().optional().describe("Note shown to the customer."),
       footer: z.string().optional().describe("Footer text."),
+      dont_carry_over_notes_to_invoice: z.boolean().optional().describe("Prevent estimate notes from carrying over when converted to an invoice. Omit to use Wave defaults or preserve the current setting."),
       discounts: discountsSchema,
       deposit_status: z.string().optional().describe("DISABLED, ENABLED_OPTIONAL, or ENABLED_MANDATORY."),
       deposit_value: z.string().optional().describe('Deposit amount or percentage, e.g. "25".'),
@@ -4715,6 +4722,7 @@ registerWriteTool(
       currency: args.currency?.toUpperCase(),
       exchangeRate: decimalStr(args.exchange_rate),
       memo: args.memo,
+      dontCarryOverNotesToInvoice: args.dont_carry_over_notes_to_invoice,
       footer: args.footer,
       discounts: normalizeDiscounts(args.discounts, "Estimate"),
       depositStatus: args.deposit_status?.toUpperCase(),
@@ -4760,6 +4768,7 @@ registerWriteTool(
       po_number: z.string().optional().describe("New PO number."),
       memo: z.string().optional().describe("New customer-facing memo."),
       footer: z.string().optional().describe("New footer."),
+      dont_carry_over_notes_to_invoice: z.boolean().optional().describe("Prevent estimate notes from carrying over when converted to an invoice. Omit to use Wave defaults or preserve the current setting."),
       discounts: discountsSchema,
       deposit_status: z.string().optional().describe("DISABLED, ENABLED_OPTIONAL, ENABLED_MANDATORY."),
       deposit_value: z.string().optional().describe("Deposit amount or percentage."),
@@ -4785,6 +4794,7 @@ registerWriteTool(
       estimateNumber: args.estimate_number,
       poNumber: args.po_number,
       memo: args.memo,
+      dontCarryOverNotesToInvoice: args.dont_carry_over_notes_to_invoice,
       footer: args.footer,
       discounts: normalizeDiscounts(args.discounts, "Estimate"),
       depositStatus: args.deposit_status?.toUpperCase(),

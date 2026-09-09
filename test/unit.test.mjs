@@ -698,3 +698,59 @@ test("no cache tools are registered and reads are not memoized", async () => {
     await server.server.close();
   }
 });
+
+// Optional estimate conversion controls must survive MCP validation and compact().
+test("estimate notes option and invoice source filter reach Wave unchanged", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    const estimate = { id: "estimate-1", estimateNumber: "1", dontCarryOverNotesToInvoice: false };
+    const data = request.query.includes("mutation CreateEstimate")
+      ? { estimateCreate: { didSucceed: true, estimate } }
+      : request.query.includes("mutation PatchEstimate")
+        ? { estimatePatch: { didSucceed: true, estimate } }
+        : request.query.includes("query GetEstimate")
+          ? { business: { estimate } }
+          : { business: { invoices: { edges: [], pageInfo: { currentPage: 1, totalPages: 1, totalCount: 0 } } } };
+    return new Response(JSON.stringify({ data }), { status: 200 });
+  };
+  const server = createWaveServer({ getAccessToken: async () => "fixture", hasCredentials: true, writesEnabled: true, defaultBusinessId: "biz-1" });
+  const client = new Client({ name: "conversion-options-test", version: "1" });
+  const [ct, st] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.server.connect(st), client.connect(ct)]);
+  try {
+    for (const [name, args] of [
+      ["wave_create_estimate", { customer_id: "customer-1", items: [{ productId: "product-1", unitPrice: "1" }] }],
+      ["wave_patch_estimate", { estimate_id: "estimate-1", customer_id: "customer-1", status: "DRAFT", title: "Estimate", estimate_date: "2026-09-09", due_date: "2026-10-09", currency: "USD", exchange_rate: "1" }],
+    ]) {
+      for (const value of [true, false, undefined]) {
+        const result = await client.callTool({ name, arguments: { ...args, ...(value === undefined ? {} : { dont_carry_over_notes_to_invoice: value }), response_format: "json" } });
+        assert.notEqual(result.isError, true, JSON.stringify(result));
+        const input = requests.at(-1).variables.input;
+        assert.equal(input.dontCarryOverNotesToInvoice, value);
+        assert.equal(Object.hasOwn(input, "dontCarryOverNotesToInvoice"), value !== undefined);
+        assert.match(requests.at(-1).query, /dontCarryOverNotesToInvoice/);
+      }
+      const before = requests.length;
+      const invalid = await client.callTool({ name, arguments: { ...args, dont_carry_over_notes_to_invoice: "false" } });
+      assert.equal(invalid.isError, true);
+      assert.equal(requests.length, before);
+    }
+    for (const value of ["estimate-1", undefined]) {
+      const result = await client.callTool({ name: "wave_list_invoices", arguments: value ? { source_id: value } : {} });
+      assert.notEqual(result.isError, true, JSON.stringify(result));
+      assert.equal(requests.at(-1).variables.sourceId, value);
+      assert.equal(Object.hasOwn(requests.at(-1).variables, "sourceId"), value !== undefined);
+      assert.match(requests.at(-1).query, /sourceId: \$sourceId/);
+    }
+    const detail = await client.callTool({ name: "wave_get_estimate", arguments: { estimate_id: "estimate-1" } });
+    assert.notEqual(detail.isError, true);
+    assert.match(detail.content[0].text, /Prevent notes carrying to invoice.*false/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await client.close();
+    await server.server.close();
+  }
+});
