@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-09-22
+
+### Fixed
+
+- The hosted connector no longer forgets the default business. The Worker's
+  Durable Object reruns the server factory whenever it restarts, including
+  after an idle eviction, so a default set with `wave_set_default_business`
+  was lost a few minutes later and the next call failed with "No business
+  selected." The Worker now keeps the default in Durable Object storage. The
+  factory takes a new `onDefaultBusinessChange` option for this. ([#4])
+- A bare business UUID is now accepted anywhere a `business_id` is. Wave's
+  API only recognizes the base64 GraphQL id and answered a UUID with "could
+  not be found." The server now wraps a UUID into that form, and the
+  `business_id` descriptions say which format is expected.
+
+[#4]: https://github.com/oliverames/wave-mcp-server/issues/4
+
 ## [1.0.7] - 2026-09-02
 
 ### Fixed
