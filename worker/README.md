@@ -148,7 +148,10 @@ things can mislead you here, both seen on 2026-09-02:
 - `wrangler deploy` in a non-interactive shell with no `CLOUDFLARE_API_TOKEN`
   stops at login, and an earlier session's "redeploy" turned out to be a
   `--dry-run`. Look for `Uploaded wave-mcp-connector` and a version ID in the
-  output; nothing short of that is a deploy.
+  output; nothing short of that is a deploy. A non-interactive deploy works with the
+  Cloudflare Global API Key: export `CLOUDFLARE_API_KEY`, `CLOUDFLARE_EMAIL`,
+  and `CLOUDFLARE_ACCOUNT_ID` before `npm run deploy` (used for 1.0.8 on
+  2026-09-22).
 - The Worker's `modified_on` in the Cloudflare API and dashboard does not
   track deployments. It stayed at 2026-07-30 across real deploys.
 

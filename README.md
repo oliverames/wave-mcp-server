@@ -409,7 +409,7 @@ at all, which catches a field Wave renames before a user does.
 
 ```bash
 npm install
-npm test                  # 58 unit tests, no network
+npm test                  # 74 unit tests, no network
 npm run smoke:list-tools  # start over stdio, enumerate tools
 npm run smoke:packed      # pack, install, and launch via the bin symlink
 npm run smoke:schema      # validate every query against live Wave
