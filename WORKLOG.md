@@ -3,6 +3,43 @@
 Notable changes, and the reasoning behind them. For the user-facing summary,
 see the release notes.
 
+## 2026-09-22 - Released 1.0.8: hosted default business survives restarts; bare UUIDs accepted
+
+**What changed**: Handed off from a Cowork session with no GitHub access. On
+the hosted connector, `wave_set_default_business` succeeded, but a later call
+failed with "No business selected." Reproduced live: the default survived an
+immediate call, then `wave_auth_status` reported `default_business_id: null` a
+few idle minutes later in the same session. The cause is `McpAgent.onStart()`,
+which calls `init()` on every Durable Object start, including after an idle
+eviction. `init()` rebuilds the server, and the default lived only in the
+factory's closure. `createWaveServer` now takes `onDefaultBusinessChange`, and
+`WaveMCP` stores the default in Durable Object storage and passes it back on
+`init()`. The server also wraps a bare business UUID into the base64 GraphQL
+id, which Wave requires. Tracked in issue #4.
+
+**Decisions made**: The handoff guessed that the connector was stateless per
+call and suggested documenting "pass business_id every call." Reproduction
+ruled that out, so this is a real fix rather than a documentation change. The
+`business_id` description still recommends passing the id when calls are
+minutes apart, because a new MCP session starts with an empty default. The
+default is scoped to the session (one Durable Object per session), not to the
+user.
+
+**Verification**: 74 root and 44 Worker tests pass. `smoke:list-tools`,
+`smoke:packed`, `smoke:schema` (64/64), `release:check`, and a Wrangler dry run
+also pass. CI and the Release workflow passed, and the job logged
+`+ @oliverames/mcp-server-for-wave@1.0.8`. The Worker was deployed from this
+session with the Cloudflare Global API Key (`CLOUDFLARE_API_KEY` plus
+`CLOUDFLARE_EMAIL`), which needs no interactive login, as version
+`3b42943c-269e-4e51-9c90-1b4b3402d715`. The three documented probes returned
+401, three headers, and 403. Live, `wave_set_default_business` accepted the
+bare UUID and answered with the base64 id, which shows the new code is serving. After about
+five idle minutes, the window that cleared the default before the fix,
+`wave_auth_status` still reported it. That strongly suggests persistence
+works, but the Durable Object's eviction is not directly observable, so it is
+not proof that a restart happened in that window. npm served 1.0.8 as `latest`
+a few minutes after the publish.
+
 ## 2026-09-02 - Released 1.0.7 for the AccountSubtype.archivable null; schema coverage audit
 
 **What changed**: Every account read through the hosted connector failed with
