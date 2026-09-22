@@ -9,6 +9,8 @@ import { createWaveServer } from "../../index.js";
 import { REMOTE_SERVER_INFO } from "./brand-assets.js";
 import { getFreshAccessToken, isAllowedWaveUser } from "./wave-oauth.js";
 
+const DEFAULT_BUSINESS_KEY = "defaultBusinessId";
+
 export class WaveMCP extends McpAgent {
   async init() {
     const { waveUserId, waveEmail, writesEnabled, tokenKey } = this.props;
@@ -19,11 +21,18 @@ export class WaveMCP extends McpAgent {
       throw new Error("This Wave account is not authorized to use this connector.");
     }
 
+    // McpAgent reruns init() whenever the Durable Object restarts, including
+    // after an idle eviction, so the default business must live in storage
+    // rather than only in the factory's closure.
+    const defaultBusinessId = await this.ctx.storage.get(DEFAULT_BUSINESS_KEY);
+
     const { server } = createWaveServer({
       // Called per outbound Wave request, so an expiring token is refreshed
       // mid-session rather than failing the call.
       getAccessToken: () => getFreshAccessToken(this.env, waveUserId, tokenKey),
       hasCredentials: true,
+      defaultBusinessId,
+      onDefaultBusinessChange: (businessId) => this.ctx.storage.put(DEFAULT_BUSINESS_KEY, businessId),
       writesEnabled: !!writesEnabled,
       runtime: {
         tokenSource: "Wave OAuth (hosted connector)",

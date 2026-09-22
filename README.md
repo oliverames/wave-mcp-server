@@ -302,7 +302,7 @@ it.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `WAVE_ACCESS_TOKEN` | Yes | (none) | OAuth2 bearer token from the Wave developer portal |
-| `WAVE_BUSINESS_ID` | No | (none) | Default business, so tools can omit `business_id` |
+| `WAVE_BUSINESS_ID` | No | (none) | Default business, so tools can omit `business_id`. The base64 id or the bare business UUID |
 | `WAVE_ALLOW_WRITES` | No | off | Set to `1` to register the 44 tools that change or send data |
 | `WAVE_ACCESS_TOKEN_FILE` | No | (none) | Read the token from a file instead |
 | `WAVE_OP_PATH` | No | (none) | Read the token from 1Password, e.g. `op://Vault/Item/credential` |

@@ -787,6 +787,17 @@ const ESTIMATE_SET = ["estimate", "estimateDiscount", "money"];
 const BUSINESS_SET = ["business", "address"];
 
 // --- Server factory ---
+// Wave's GraphQL ids are base64("Business:<uuid>"), but the web app and URLs
+// show the bare UUID. Wave answers a bare UUID with "could not be found", so
+// wrap one into the GraphQL form rather than making the caller know that.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizeBusinessId(businessId) {
+  const trimmed = typeof businessId === "string" ? businessId.trim() : businessId;
+  if (!trimmed) return undefined;
+  return UUID_PATTERN.test(trimmed) ? btoa(`Business:${trimmed.toLowerCase()}`) : trimmed;
+}
+
 // Builds the entire tool and resource layer around injected credentials and
 // write gating, so the same layer serves both the local stdio process and
 // hosted deployments (a Cloudflare Worker with per-user OAuth tokens).
@@ -795,6 +806,9 @@ const BUSINESS_SET = ["business", "address"];
 //   getAccessToken: async () => string|null — called per outbound request.
 //   hasCredentials: boolean — whether a token source exists.
 //   defaultBusinessId: string|undefined — fallback business for tools.
+//   onDefaultBusinessChange: async (id) => void — persists the default chosen
+//     by wave_set_default_business. The hosted Worker needs this because its
+//     Durable Object reruns this factory after every idle eviction.
 //   writesEnabled: boolean — registers write tools when true.
 //   runtime: auth-status reporting only; all fields optional.
 //   serverInfo: { name, version } override.
@@ -804,6 +818,7 @@ const {
   getAccessToken = null,
   hasCredentials = false,
   defaultBusinessId = undefined,
+  onDefaultBusinessChange = null,
   writesEnabled: allowWrites = false,
   runtime = {},
   serverInfo = { name: "wave_mcp", version: SERVER_VERSION },
@@ -814,7 +829,7 @@ const {
 let currentToken = null;
 
 // Session default, settable at runtime by wave_set_default_business.
-let sessionBusinessId = defaultBusinessId;
+let sessionBusinessId = normalizeBusinessId(defaultBusinessId);
 
 const server = new McpServer(
   { name: serverInfo.name, version: serverInfo.version },
@@ -827,7 +842,8 @@ const server = new McpServer(
       "",
       "Most tools operate on one business. Call wave_list_businesses first, then",
       "wave_set_default_business so later calls can omit business_id. Any tool still",
-      "accepts an explicit business_id to override the default.",
+      "accepts an explicit business_id to override the default. Business ids are the",
+      "base64 ids that wave_list_businesses returns; a bare business UUID is also accepted.",
       "",
       'Every read tool accepts response_format ("markdown" for a compact summary,',
       '"json" for the complete record) and paginates with page/page_size, or',
@@ -1250,7 +1266,7 @@ function stripUndefined(value) {
 }
 
 function requireBusinessId(businessId) {
-  const resolved = businessId || sessionBusinessId;
+  const resolved = normalizeBusinessId(businessId) || sessionBusinessId;
   if (!resolved) {
     throw new WaveConfigError(
       "No business selected. Call wave_list_businesses to see the available IDs, then either pass " +
@@ -1693,7 +1709,10 @@ const fetchAllSchema = z
 const businessIdSchema = z
   .string()
   .optional()
-  .describe("Business to operate on. Defaults to the session business set by wave_set_default_business.");
+  .describe(
+    "Business to operate on: the base64 id from wave_list_businesses (a bare business UUID is also accepted). " +
+      "Defaults to the business set by wave_set_default_business. When calls may be minutes apart, pass it on every call."
+  );
 
 const paginationSchema = {
   page: pageSchema,
@@ -2165,10 +2184,16 @@ registerTool(
     readOnly: false,
     idempotent: true,
     description:
-      "Set the business that later tool calls use when none is given. This is session state on the running server, not a change in Wave. Set WAVE_BUSINESS_ID in the environment to make it persist across restarts.",
-    inputSchema: { business_id: z.string().describe("The Wave business ID to make the default.") },
+      "Set the business that later tool calls use when none is given. This is connector state, not a change in Wave. The hosted connector keeps it for the session; the local server keeps it until it restarts (set WAVE_BUSINESS_ID to make it permanent). Passing business_id explicitly always overrides it.",
+    inputSchema: {
+      business_id: z
+        .string()
+        .describe("The Wave business ID to make the default: the base64 id from wave_list_businesses, or the bare business UUID."),
+    },
   },
-  async ({ business_id }) => {
+  async ({ business_id: rawBusinessId }) => {
+    const business_id = normalizeBusinessId(rawBusinessId);
+    if (!business_id) throw new WaveConfigError("business_id is empty. Call wave_list_businesses to see valid IDs.");
     const data = await waveFetch(Q_GET_BUSINESS, { id: business_id });
     const business = data.business;
     if (!business) {
@@ -2176,6 +2201,7 @@ registerTool(
         `No business found with ID \`${business_id}\`, so the default is unchanged. Call wave_list_businesses to see valid IDs.`
       );
     }
+    if (onDefaultBusinessChange) await onDefaultBusinessChange(business_id);
     sessionBusinessId = business_id;
     return ok(
       `Default business set to **${business.name}** (\`${business_id}\`). Later calls can omit business_id.`
@@ -6024,6 +6050,7 @@ registerResource(
       sanitizeErrorMessage,
       assertWaveApiUrl,
       requireBusinessId,
+      normalizeBusinessId,
       waveFetch,
       walkPages,
       EXPENSE_SYNONYMS,

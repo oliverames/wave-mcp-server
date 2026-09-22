@@ -295,6 +295,50 @@ test("no business at all produces an actionable error", () => {
   assert.throws(() => bare.__internals.requireBusinessId(), /No business selected/);
 });
 
+test("a bare business UUID is wrapped into Wave's base64 GraphQL id", () => {
+  const graphqlId = "QnVzaW5lc3M6MDJhOGExZDktYjI3MS00NjQzLWJkMDYtOTBiMDJhODQ0MmQ1";
+  assert.equal(H.normalizeBusinessId("02a8a1d9-b271-4643-bd06-90b02a8442d5"), graphqlId);
+  assert.equal(H.normalizeBusinessId(" 02A8A1D9-B271-4643-BD06-90B02A8442D5 "), graphqlId);
+  assert.equal(H.normalizeBusinessId(graphqlId), graphqlId);
+  assert.equal(H.requireBusinessId("02a8a1d9-b271-4643-bd06-90b02a8442d5"), graphqlId);
+  assert.equal(H.normalizeBusinessId(""), undefined);
+});
+
+test("the default business survives a server rebuild through onDefaultBusinessChange", async () => {
+  // The hosted Durable Object reruns createWaveServer after every idle
+  // eviction; this rebuild stands in for that restart.
+  const uuid = "02a8a1d9-b271-4643-bd06-90b02a8442d5";
+  const graphqlId = H.normalizeBusinessId(uuid);
+  const requests = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    return new Response(JSON.stringify({ data: { business: { id: request.variables.id, name: "Fixture Co" } } }), { status: 200 });
+  };
+  let stored;
+  const first = createWaveServer({
+    getAccessToken: async () => "fixture",
+    hasCredentials: true,
+    onDefaultBusinessChange: async (id) => { stored = id; },
+  });
+  const client = new Client({ name: "default-business-test", version: "1" });
+  const [ct, st] = InMemoryTransport.createLinkedPair();
+  await Promise.all([first.server.connect(st), client.connect(ct)]);
+  try {
+    const result = await client.callTool({ name: "wave_set_default_business", arguments: { business_id: uuid } });
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.equal(requests.at(-1).variables.id, graphqlId);
+    assert.equal(stored, graphqlId);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await client.close();
+    await first.server.close();
+  }
+  const rebuilt = createWaveServer({ getAccessToken: async () => "fixture", hasCredentials: true, defaultBusinessId: stored });
+  assert.equal(rebuilt.__internals.requireBusinessId(), graphqlId);
+});
+
 // --- Tool registration ------------------------------------------------------
 
 test("every tool carries the wave_ prefix and a description", () => {
