@@ -1,3 +1,4 @@
+import { deleteConnectionDefaults } from "./wave-connection-state.js";
 /**
  * Everything that is not the MCP transport: the landing page, the consent
  * screen, the Wave OAuth dance, privacy, and connection deletion.
@@ -313,6 +314,7 @@ app.post("/delete", async (c) => {
   }
 
   const deleted = await deleteAllTokenRecords(c.env.OAUTH_KV, waveUserId);
+  await deleteConnectionDefaults(c.env, waveUserId);
   return c.html(
     layout(
       "Deleted",

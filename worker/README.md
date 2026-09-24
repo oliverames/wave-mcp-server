@@ -2,7 +2,7 @@
 
 A Cloudflare Worker serving the same tool surface as the local stdio server, at
 a URL an MCP client can connect to without installing anything. Users authorize
-it against their own Wave account over OAuth; each session gets its own tokens.
+it against their own Wave account over OAuth; each authenticated connection gets its own tokens.
 
 The tool layer is imported from `../index.js`, so the hosted and local servers
 cannot drift apart. This directory only adds the OAuth dance, token storage,
@@ -11,8 +11,9 @@ and the transport hardening a public endpoint needs.
 ## Architecture
 
 ```
-Client → OAuthProvider ──┬─ /mcp, /sse   → WaveMCP (Durable Object per session)
-                         │                    └→ createWaveServer() from ../index.js
+Client → OAuthProvider ──┬─ /mcp modern → SDK v2 factory, per request
+                         ├─ /mcp legacy, /sse → WaveMCP (temporary session lane)
+                         │                    └→ shared createWaveServer()
                          └─ everything else → WaveHandler (Hono)
                                                  landing, consent, /callback,
                                                  privacy, deletion
@@ -21,7 +22,9 @@ Client → OAuthProvider ──┬─ /mcp, /sse   → WaveMCP (Durable Object p
 | File | Role |
 |------|------|
 | `src/index.js` | OAuth provider wrapping the MCP endpoints |
-| `src/wave-mcp.js` | Durable Object agent; injects the per-user token getter |
+| `src/wave-mcp.js` | Temporary legacy Durable Object transport and session state |
+| `src/wave-stateless.js` | SDK v2 request factory and protocol-era routing |
+| `src/wave-connection-state.js` | Default business per authenticated connection |
 | `src/wave-oauth.js` | Wave OAuth2, encrypted token records, refresh |
 | `src/wave-handler.js` | Landing, consent, callback, privacy, deletion |
 | `src/mcp-origin.js` | Browser Origin gate on the MCP transport |
@@ -167,3 +170,48 @@ The hosted landing page and MCP initialization metadata advertise the canonical
 connector artwork through explicit 8-bit PNG favicons at 16, 32, 48, 64, 96,
 128, and 256 pixels, plus ICO and Apple touch variants. Regenerate them with
 `npm run build:worker-icons` after changing `assets/icon.png`.
+
+## MCP SDK v2 migration
+
+Modern MCP 2026-07-28 requests use `createMcpHandler` and a fresh SDK v2 server
+at the existing `/mcp` URL. OAuth, the exact browser Origin gate, token refresh,
+write permissions and all tool/resource definitions are shared with the old
+path. The current deployment configuration and stored grants remain unchanged.
+
+The owner selected a saved default business per authenticated connection for
+stateless clients. Its identity comes from verified OAuth `waveUserId` and
+`tokenKey`, never a client-supplied session or header. Separate objects in the
+existing `OAUTH_STATE` namespace hold these defaults. Pre-tokenKey grants use
+one legacy user connection, matching their shared Wave token record. Deleting
+a user's connection records also removes all of that user's new defaults.
+
+Existing 2025-era `/mcp` sessions and `/sse` clients temporarily retain their
+original `WaveMCP` transport and session defaults. Old session defaults are not
+copied into the new connection scope because several sessions may disagree.
+A migrating connection initially has no default and can choose one with
+`wave_set_default_business`, or pass `business_id` explicitly.
+
+### Verification and retirement gates
+
+Run `npm test` here and `npm run test:integration`. The latter starts a local
+Wrangler Worker with disposable KV/Durable Object storage. It replaces only
+the human Wave login with dummy identities, issues real connector OAuth tokens,
+and blocks all outbound requests except an in-memory Wave response. The
+fixture entrypoint is never referenced by production `wrangler.jsonc`.
+
+This is the tested compatibility stage, not completed production retirement.
+Before removing the legacy lane:
+
+1. Deploy and verify modern clients on the receiving host, including refresh,
+   owner allowlist, write permissions, default business and deletion.
+2. Confirm every configured client has moved off 2025-era sessions and `/sse`.
+   Observe existing Worker request logs for a full maximum client session
+   lifetime agreed by the owner. Do not infer absence from local tests.
+3. Let existing legacy sessions finish. Then remove the legacy branch and
+   `/sse` handler, `WaveMCP` export and binding in a separate reviewed release.
+4. Retain the old migration history. Deleting the old Durable Object class and
+   its persisted session data requires explicit owner approval in that release.
+   No destructive migration is included here.
+
+Primary guidance: [Cloudflare SDK v2 migration](https://developers.cloudflare.com/agents/model-context-protocol/guides/migrate-to-mcp-sdk-v2/)
+and [handler APIs](https://developers.cloudflare.com/agents/model-context-protocol/apis/handler-api/).

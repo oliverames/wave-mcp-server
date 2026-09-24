@@ -1,0 +1,24 @@
+{
+  "name": "wave-migration-fixture",
+  "main": "migration-worker.js",
+  "compatibility_date": "2025-03-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [{"binding": "OAUTH_KV", "id": "fixture"}],
+  "durable_objects": {"bindings": [
+    {"name": "MCP_OBJECT", "class_name": "WaveMCP"},
+    {"name": "OAUTH_STATE", "class_name": "OAuthTransientState"}
+  ]},
+  "migrations": [
+    {"tag": "v1", "new_sqlite_classes": ["WaveMCP"]},
+    {"tag": "v2", "new_sqlite_classes": ["OAuthTransientState"]}
+  ],
+  "vars": {
+    "CONNECTOR_BASE_URL": "http://127.0.0.1:18943",
+    "MCP_ALLOWED_ORIGINS": "https://chatgpt.com",
+    "WAVE_MCP_NO_AUTOSTART": "1",
+    "WAVE_DISABLE_AGENT_CONFIG_FALLBACK": "1",
+    "DATA_ENCRYPTION_KEY": "fixture-data-key-that-is-not-a-real-secret",
+    "COOKIE_ENCRYPTION_KEY": "fixture-cookie-key-that-is-not-a-real-secret",
+    "ALLOWED_WAVE_USERS": "fixture-user"
+  }
+}

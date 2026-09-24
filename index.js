@@ -812,6 +812,7 @@ function normalizeBusinessId(businessId) {
 //   writesEnabled: boolean — registers write tools when true.
 //   runtime: auth-status reporting only; all fields optional.
 //   serverInfo: { name, version } override.
+//   serverConstructor: MCP server implementation; defaults to SDK v1 for stdio.
 export function createWaveServer(options = {}) {
 
 const {
@@ -822,6 +823,7 @@ const {
   writesEnabled: allowWrites = false,
   runtime = {},
   serverInfo = { name: "wave_mcp", version: SERVER_VERSION },
+  serverConstructor = McpServer,
 } = options;
 
 // Most-recently-seen token, kept only so sanitizeErrorMessage can redact it
@@ -831,7 +833,7 @@ let currentToken = null;
 // Session default, settable at runtime by wave_set_default_business.
 let sessionBusinessId = normalizeBusinessId(defaultBusinessId);
 
-const server = new McpServer(
+const server = new serverConstructor(
   { name: serverInfo.name, version: serverInfo.version },
   {
     instructions: [
@@ -2184,7 +2186,7 @@ registerTool(
     readOnly: false,
     idempotent: true,
     description:
-      "Set the business that later tool calls use when none is given. This is connector state, not a change in Wave. The hosted connector keeps it for the session; the local server keeps it until it restarts (set WAVE_BUSINESS_ID to make it permanent). Passing business_id explicitly always overrides it.",
+      "Set the business that later tool calls use when none is given. This is connector state, not a change in Wave. The hosted connector keeps it for the authenticated connection (legacy clients: the session); the local server keeps it until it restarts (set WAVE_BUSINESS_ID to make it permanent). Passing business_id explicitly always overrides it.",
     inputSchema: {
       business_id: z
         .string()

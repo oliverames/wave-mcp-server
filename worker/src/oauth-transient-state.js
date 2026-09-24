@@ -19,6 +19,26 @@ export class OAuthTransientState {
   async fetch(request) {
     const url = new URL(request.url);
 
+    // Separate application state for the stateless MCP lane. These objects
+    // are named by authenticated user and keys by connection, never MCP session.
+    if (url.pathname.startsWith("/defaults/")) {
+      if (request.method === "GET") {
+        return Response.json((await this.storage.get(url.pathname)) ?? null);
+      }
+      if (request.method === "PUT") {
+        const value = await request.json();
+        if (typeof value !== "string" || value.length > 2048) return new Response("Invalid default", { status: 400 });
+        await this.storage.put(url.pathname, value);
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === "DELETE") {
+        // The caller uses an object dedicated to this user's defaults.
+        await this.storage.deleteAll();
+        return new Response(null, { status: 204 });
+      }
+      return new Response("Method not allowed", { status: 405 });
+    }
+
     if (request.method === "PUT") {
       const value = await request.json();
       await this.storage.put(url.pathname, { value, expires_at: Date.now() + STATE_TTL_MS });

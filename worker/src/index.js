@@ -9,6 +9,7 @@ import { CONNECTOR_RESOURCE_METADATA } from "./brand-assets.js";
 import { rejectUntrustedMcpOrigin } from "./mcp-origin.js";
 import { applyTransportSecurityHeaders } from "./response-security.js";
 import { WaveMCP } from "./wave-mcp.js";
+import { WaveMcpHandler } from "./wave-stateless.js";
 import { OAuthTransientState } from "./oauth-transient-state.js";
 import { WaveHandler } from "./wave-handler.js";
 
@@ -16,7 +17,7 @@ export { WaveMCP, OAuthTransientState };
 
 const oauthProvider = new OAuthProvider({
   apiHandlers: {
-    "/mcp": WaveMCP.serve("/mcp"),
+    "/mcp": WaveMcpHandler,
     "/sse": WaveMCP.serveSSE("/sse"),
   },
   defaultHandler: WaveHandler,
