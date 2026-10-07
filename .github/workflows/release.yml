@@ -55,3 +55,11 @@ jobs:
         with:
           files: dist/*.mcpb
           generate_release_notes: true
+
+  linear-release:
+    needs: [publish]
+    uses: ./.github/workflows/linear-release.yml
+    with:
+      source_sha: ${{ github.sha }}
+      dry_run: false
+    secrets: inherit
