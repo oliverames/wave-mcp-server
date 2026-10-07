@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-10-07 - README Refresh Closeout
+
+**What changed**: Corrects tool inventory, configuration examples, credential options, and test claims.
+
+**Decisions made**: Keep setup and status claims tied to current source or explicitly dated evidence. This entry records the multi-repository README maintenance session.
+
+**Left off at**: Resolved this session: README review and publication at `ad7ecd1`. Relative links, examples and applicable counts were checked. Verification covered documentation. No fresh runtime acceptance is claimed.
+
+**Open questions**: No new question from the README refresh. Prior receiving-host transport and legacy-retirement gates remain outside this pass. No Wave account operation, package release or hosted deployment ran.
+
+---
+
 ## Open items
 
 - Delete the dangling `v1.0.4` tag on the remote or leave it; it published nothing and nothing depends on it (since 2026-08-27; still on the remote on 2026-09-22).
