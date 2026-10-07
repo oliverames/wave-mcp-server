@@ -5,13 +5,13 @@
 <h1 align="center">MCP Server for Wave</h1>
 
 <p align="center">
-  <strong>Complete access to Wave Accounting from Claude, Codex, and any other MCP client</strong>
+  <strong>Review Wave accounting and manage invoices through your MCP client</strong>
 </p>
 
 <p align="center">
   <code>74 tools</code> &bull;
-  <code>42/42 mutations</code> &bull;
-  <code>11/11 queries</code> &bull;
+  <code>30 read-only tools by default</code> &bull;
+  <code>44 optional write tools</code> &bull;
   <code>8 resources</code>
 </p>
 
@@ -29,40 +29,17 @@
 
 ---
 
-Wave gives small businesses free accounting and invoicing, and a GraphQL API that
-covers nearly all of it. This server puts that entire API in front of an AI
-assistant: invoices and payments, estimates and deposits, customers, vendors,
-products, sales taxes, the chart of accounts, and double-entry bookkeeping.
+This Model Context Protocol (MCP) server connects an AI assistant to Wave's accounting API. It covers invoices and payments, estimates and deposits, customers, vendors, products, sales taxes, accounts, and bookkeeping transactions.
 
-Every query is verified against Wave's live schema in CI, and the tools that
-change or send anything stay hidden until you turn them on.
+The local server and hosted Worker share the same tool definitions. Tools that change or send data stay hidden until write access is enabled. Node.js 18 or later is required for the local package.
 
 ## Why This Exists
 
-Bookkeeping is mostly translation. You have a receipt, a bank line, an email
-promising to pay next week, and none of it is in the shape your books want. The
-work is not hard, it is just constant, and it is exactly the kind of task worth
-handing to an assistant that can hold the whole picture at once.
+An accounting assistant needs enough context to connect a receipt, a customer, and the corresponding accounts. This server keeps those operations in one interface and validates amounts before sending a bookkeeping transaction.
 
-Doing that well needs more than a few convenience endpoints. An assistant that
-can list invoices but not record the payment, or draft an estimate but not
-convert it, forces you back into the web app halfway through every task. So this
-server covers the API completely: all 42 mutations, all 11 root queries, every
-sub-resource on a business. If Wave's API can do it, a tool here does it.
+The default installation exposes 30 read-only tools. Setting `WAVE_ALLOW_WRITES=1` adds 44 tools that can create, change, delete, or send records. Sending invoices and receipts emails real customers, so write access should match the work you've authorized.
 
-Two decisions shape the rest:
-
-**Writes are off by default.** Wave has genuinely irreversible operations.
-Sending an invoice emails a real customer. Deleting one is permanent. A default
-install exposes 30 read-only tools; the other 44 appear only when you set
-`WAVE_ALLOW_WRITES=1`. Reading your books should not require trusting a model
-with your outbox.
-
-**Errors explain themselves.** Wave rejects an unbalanced transaction without
-telling you which figure is wrong. This server compares the anchor against the
-line items first and reports the difference. A category word that matches no
-account produces the list of real account names rather than a silent guess at
-the first one.
+Validation errors name missing account information or an unbalanced transaction amount instead of silently choosing an account.
 
 ## Quick Start
 
@@ -73,12 +50,14 @@ the first one.
       "command": "npx",
       "args": ["-y", "@oliverames/mcp-server-for-wave@latest"],
       "env": {
-        "WAVE_ACCESS_TOKEN": "your_token_here"
+        "WAVE_OP_PATH": "op://Development/Wave/credential"
       }
     }
   }
 }
 ```
+
+The example uses the 1Password CLI and a secret reference. Replace the reference with your own item, or supply `WAVE_ACCESS_TOKEN` through your launcher.
 
 Then ask for your businesses and set one as the default:
 
@@ -105,17 +84,18 @@ codex mcp add wave-mcp-server \
   -- npx -y @oliverames/mcp-server-for-wave@latest
 ```
 
-Verify with `codex mcp list`. Startup takes about 0.2s, well inside Codex's
-10-second `startup_timeout_sec`, and the retry budget is capped below its
-60-second `tool_timeout_sec` so a slow API surfaces Wave's real error rather
-than a client timeout.
+Verify registration with `codex mcp list`. The server's request timeout and total retry budget are configurable through the environment variables below.
 
 ### Enable write tools
 
+Merge these environment settings into the configured server entry:
+
 ```json
-"env": {
-  "WAVE_ACCESS_TOKEN": "your_token_here",
-  "WAVE_ALLOW_WRITES": "1"
+{
+  "env": {
+    "WAVE_ACCESS_TOKEN": "your_token_here",
+    "WAVE_ALLOW_WRITES": "1"
+  }
 }
 ```
 
@@ -138,7 +118,11 @@ Rather than pasting a token into a config file, point the server at a secret
 reference and it will shell out to the `op` CLI on startup:
 
 ```json
-"env": { "WAVE_OP_PATH": "op://Development/Wave/credential" }
+{
+  "env": {
+    "WAVE_OP_PATH": "op://Development/Wave/credential"
+  }
+}
 ```
 
 `WAVE_ACCESS_TOKEN_FILE` works the same way for a file on disk.
@@ -187,6 +171,17 @@ customers carry the largest overdue balances.
 ```
 
 ## Tools Reference
+
+The source defines 74 tools. Categories below include optional writes:
+
+| Category | Count | Representative Tools |
+| --- | --- | --- |
+| Businesses and reference data | 14 | `wave_list_businesses`, `wave_auth_status` |
+| Chart of accounts | 5 | `wave_list_accounts`, `wave_create_account` |
+| Customers, vendors, products, and taxes | 17 | `wave_list_customers`, `wave_list_vendors` |
+| Invoices and payments | 14 | `wave_get_invoice`, `wave_send_invoice` |
+| Estimates and deposits | 19 | `wave_get_estimate`, `wave_convert_estimate_to_invoice` |
+| Bookkeeping | 5 | `wave_create_money_transaction`, `wave_create_deposit_transaction` |
 
 Names are prefixed `wave_` so they do not collide with other MCP servers.
 Tools marked **W** require `WAVE_ALLOW_WRITES=1`.
@@ -301,7 +296,7 @@ it.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `WAVE_ACCESS_TOKEN` | Yes | (none) | OAuth2 bearer token from the Wave developer portal |
+| `WAVE_ACCESS_TOKEN` | One credential source | (none) | OAuth2 bearer token from the Wave developer portal |
 | `WAVE_BUSINESS_ID` | No | (none) | Default business, so tools can omit `business_id`. The base64 id or the bare business UUID |
 | `WAVE_ALLOW_WRITES` | No | off | Set to `1` to register the 44 tools that change or send data |
 | `WAVE_ACCESS_TOKEN_FILE` | No | (none) | Read the token from a file instead |
@@ -332,8 +327,7 @@ sends numbers there because the API accepts nothing else.
 
 ## Wave API Limitations
 
-These are constraints in Wave's API, not gaps here. Each was confirmed against
-the live schema.
+The implemented GraphQL contracts have the following limits. See the [schema coverage audit](docs/reviews/2026-09-02-wave-schema-coverage-audit.md) for the dated upstream review, and rerun the schema check when updating the integration.
 
 - **Transactions cannot be read back.** Wave creates money transactions but
   exposes no query to list them; there is no `transactions` connection on
@@ -358,21 +352,11 @@ the live schema.
 
 A Cloudflare Worker serves the same tools over OAuth instead of a shared token.
 
-The hosted connector publishes the Wave connector artwork as an SVG favicon, a
-conventional ICO, Apple touch, and explicit 8-bit PNG favicons from 16 through
-256 pixels. The page head advertises the SVG first with the ICO as its
-alternate, because icon resolvers take the first usable declaration; the
-remaining sizes stay served for other consumers. The ICO carries a single 32px
-frame, since a six-frame uncompressed ICO reached 370 KB and resolvers skipped
-it rather than decode it. MCP initialization also advertises the versioned
-256px URL for clients that support server icon metadata.
 Users authorize against their own Wave account, tokens are encrypted before
 storage, and write access is chosen at authorization time so a read-only
 connection cannot be escalated later.
 
-The deployment at **https://wave.amesvt.com/mcp** is private: an owner
-allowlist restricts it to one Wave account, and any other account is refused
-before a token is stored. Deploy your own copy from `worker/` to use it.
+The configured endpoint is `https://wave.amesvt.com/mcp`. The Worker implements an owner allowlist and rejects unapproved accounts before storing their tokens. This endpoint is not a general public service. Use the Worker deployment guide to configure your own installation.
 
 See [worker/README.md](worker/README.md) for setup and the security model.
 
@@ -390,30 +374,25 @@ scripts/
   check-release-consistency  Fail the build when anything disagrees
   build-mcpb.mjs             Desktop bundle
 worker/                      Hosted OAuth connector
-test/unit.test.mjs           58 tests, no network
+test/unit.test.mjs           Offline unit tests
 ```
 
 The tool layer lives in one file on purpose. It is imported unchanged by the
 Worker, so the hosted and local servers cannot drift apart.
 
-### Verification without credentials
+### Verify API Contracts
 
-Wave validates a GraphQL document and coerces its variables *before* it checks
-authentication. An `UNAUTHENTICATED` response therefore means the query is
-correct, while `GRAPHQL_VALIDATION_FAILED` means it is not.
-
-CI exploits that to schema-check all 64 documents on every push with no token
-at all, which catches a field Wave renames before a user does.
+`npm run smoke:schema` sends the server's GraphQL documents to Wave without account credentials. The script distinguishes schema-validation failures from authentication responses. It contacts Wave, so run it separately from offline tests. A passing source review isn't evidence of current API compatibility.
 
 ## Building
 
 ```bash
-npm install
-npm test                  # 74 unit tests, no network
+npm ci
+npm test                  # offline unit tests
 npm run smoke:list-tools  # start over stdio, enumerate tools
 npm run smoke:packed      # pack, install, and launch via the bin symlink
 npm run smoke:schema      # validate every query against live Wave
-npm run release:check     # version parity across 8 manifests
+npm run release:check     # package and plugin version consistency
 npm run build:mcpb        # desktop bundle
 ```
 
