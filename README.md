@@ -398,6 +398,8 @@ npm run build:mcpb        # desktop bundle
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Linear records verified npm and GitHub/MCPB delivery in this repository's Ames Consulting (AME) release pipeline. The hosted OAuth Worker is a separate delivery channel. See [release reporting](.github/RELEASES.md) for issue references, credentials and reporting-only recovery.
+
 ## Not Affiliated With Wave
 
 An independent project, not affiliated with, endorsed by, or sponsored by Wave
