@@ -13,12 +13,20 @@
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "0.10.3",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "agents": "0.21.0",
     "hono": "^4.12.27",
     "@modelcontextprotocol/server": "2.0.0"
   },
   "devDependencies": {
     "wrangler": "^4.113.0"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": "$@modelcontextprotocol/sdk",
+    "@modelcontextprotocol/client": "2.2.0",
+    "miniflare": {
+      "sharp": "0.35.5",
+      "undici": "7.29.1"
+    }
   }
 }
