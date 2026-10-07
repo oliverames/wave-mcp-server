@@ -1,0 +1,7 @@
+{
+  "repository": "oliverames/wave-mcp-server",
+  "scheduled": true,
+  "name": "Wave MCP",
+  "mode": "github",
+  "npm": true
+}
