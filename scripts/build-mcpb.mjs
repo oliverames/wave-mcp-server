@@ -95,6 +95,7 @@ fs.mkdirSync(stageDir, { recursive: true });
 
 fs.writeFileSync(path.join(stageDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 fs.copyFileSync(path.join(projectRoot, "index.js"), path.join(stageDir, "index.js"));
+fs.cpSync(path.join(projectRoot, "lib"), path.join(stageDir, "lib"), { recursive: true });
 fs.copyFileSync(path.join(projectRoot, "package.json"), path.join(stageDir, "package.json"));
 fs.copyFileSync(path.join(projectRoot, "package-lock.json"), path.join(stageDir, "package-lock.json"));
 fs.copyFileSync(path.join(projectRoot, "assets", "icon.png"), path.join(stageDir, "icon.png"));

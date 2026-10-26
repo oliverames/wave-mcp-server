@@ -3,15 +3,27 @@
 ## The local server
 
 `@oliverames/mcp-server-for-wave` runs on your own machine as a subprocess of
-your MCP client. It has no backend and sends nothing anywhere except to Wave's
-own API at `https://gql.waveapps.com/graphql/public`.
+your MCP client. It has no backend. By default it sends nothing anywhere except
+to Wave's own API at `https://gql.waveapps.com/graphql/public`.
 
 **Stored:** nothing. The server keeps no database, cache, or log file. Your
 access token is read from the environment, a file you point it at, or 1Password,
 and lives only in process memory.
 
-**Transmitted:** your requests to Wave, and nothing else. There is no analytics,
-telemetry, or error reporting.
+**Transmitted:** your requests to Wave. There is no analytics or telemetry.
+Error reporting is off unless you set `SENTRY_DSN`; see below.
+
+**Error reporting (optional):** if the person running the server sets
+`SENTRY_DSN`, unexpected tool failures (code errors, Wave 5xx responses,
+network failures, timeouts, and queries Wave rejects as invalid) and fatal
+errors are sent to that Sentry project. Each report carries the error type, a
+fixed message, stack frames with package-relative paths, the tool name, and
+the HTTP status of a failed Wave response. Tool arguments, error messages,
+Wave responses, customer and vendor names, amounts, invoice and transaction
+details, business IDs, breadcrumbs, user data, and request data are removed
+before anything is sent. Sentry may still see the connection's IP address
+unless the receiving project is set to prevent storing it. The hosted
+connector does not use this setting.
 
 **Logged:** diagnostics go to stderr, which your MCP client may capture. Access
 tokens are redacted from error text before it is emitted.

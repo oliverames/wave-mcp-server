@@ -18,6 +18,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY index.js ./
+COPY lib/ ./lib/
 COPY scripts/ ./scripts/
 
 # Drop to the unprivileged user the base image already provides.

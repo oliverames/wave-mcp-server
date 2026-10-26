@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Optional Sentry error reporting for the local server, off unless
+  `SENTRY_DSN` is set. Reports carry only the error type, a fixed message,
+  stack frames, the tool name, and a Wave 5xx status; no financial data,
+  tool arguments, or Wave responses are sent. See `docs/privacy.md`.
+
 ## [1.0.9] - 2026-10-17
 
 ### Security

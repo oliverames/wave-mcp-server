@@ -308,6 +308,7 @@ it.
 | `WAVE_DISABLE_AGENT_CONFIG_FALLBACK` | No | off | Read only the environment, not agent config files |
 | `WAVE_LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error`, or `silent`. JSON lines on stderr |
 | `WAVE_TRACING_ENABLED` | No | off | Send a W3C `traceparent` header with each Wave request |
+| `SENTRY_DSN` | No | (none) | Turn on error reporting to that Sentry project. Unset means no reporting and `@sentry/node` is never loaded. Reports carry the error type, a fixed message, stack frames, the tool name, and a Wave 5xx status only; arguments, messages, Wave responses, and all financial data are dropped first. Needs Node 20.19 or newer. See [docs/privacy.md](docs/privacy.md) |
 
 Credentials resolve in order: environment, then the host agent's own config
 file, then `WAVE_ACCESS_TOKEN_FILE`, then 1Password. Reading the agent config

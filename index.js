@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { captureFatalError, captureToolError, errorReportingEnabled, flushErrorReporting, initErrorReporting } from "./lib/error-reporting.mjs";
 
 // --- Init ---
 
@@ -824,7 +825,30 @@ const {
   runtime = {},
   serverInfo = { name: "wave_mcp", version: SERVER_VERSION },
   serverConstructor = McpServer,
+  // Called with (toolName, error, details) when a tool fails unexpectedly.
+  // Only the stdio entry point passes one; the hosted Worker does not, and
+  // tool arguments are never passed.
+  onToolError = null,
 } = options;
+
+// Caller mistakes and Wave's own answers (auth, validation, not found, rate
+// limits, mutation input errors, 4xx) are not defects and are never
+// reported. Code errors, Wave 5xx, network failures, timeouts, and queries
+// Wave rejects as invalid are.
+function shouldReportToolError(error) {
+  if (!(error instanceof WaveError)) return true;
+  if (error instanceof WaveServerError) return !(error.status >= 400 && error.status < 500);
+  return error instanceof WaveNetworkError || error instanceof WaveTimeoutError || error instanceof WaveInternalError;
+}
+
+function reportToolError(name, error) {
+  if (!onToolError || !shouldReportToolError(error)) return;
+  try {
+    onToolError(name, error, { httpStatus: error instanceof WaveServerError ? error.status : undefined });
+  } catch {
+    // Reporting must never change a tool's result.
+  }
+}
 
 // Most-recently-seen token, kept only so sanitizeErrorMessage can redact it
 // from error text. Refreshed on every secureFetch call.
@@ -873,6 +897,14 @@ function sanitizeErrorMessage(value) {
 class WaveError extends Error {}
 class WaveAuthError extends WaveError {}
 class WaveConfigError extends WaveError {}
+
+/** Thrown for failures that are the server's fault, not the caller's: Wave rejecting a query document, or a malformed body. */
+class WaveInternalError extends WaveError {
+  constructor(message) {
+    super(message);
+    this.name = "WaveInternalError";
+  }
+}
 
 /** Wave reports mutation failures inside the payload, not as GraphQL errors. */
 class WaveMutationError extends WaveError {
@@ -1121,7 +1153,7 @@ async function waveFetch(query, variables = {}) {
     try {
       payload = JSON.parse(raw);
     } catch {
-      throw new WaveError(
+      throw new WaveInternalError(
         `Wave returned a malformed JSON body (HTTP ${response.status}): ${sanitizeErrorMessage(raw.slice(0, 200))}`
       );
     }
@@ -1163,7 +1195,7 @@ function raiseForGraphQLErrors(payload) {
     );
   }
   if (codes.has("GRAPHQL_VALIDATION_FAILED")) {
-    throw new WaveError(
+    throw new WaveInternalError(
       `Wave rejected the query as invalid: ${messages}. This is a bug in the MCP server, not in your input.`
     );
   }
@@ -1662,6 +1694,7 @@ function registerTool(name, config, handler) {
     try {
       return await handler(args);
     } catch (error) {
+      reportToolError(name, error);
       return {
         isError: true,
         content: [{ type: "text", text: sanitizeErrorMessage(error?.message ?? String(error)) }],
@@ -6067,11 +6100,16 @@ registerResource(
       WaveTimeoutError,
       WaveServerError,
       WaveNetworkError,
+      WaveInternalError,
     },
   };
 }
 
 // --- Default stdio instance ---
+
+// Optional Sentry reporting for the stdio server; a no-op unless SENTRY_DSN
+// is set, and never active in the Worker.
+if (!IS_CLOUDFLARE_WORKERS) await initErrorReporting({ release: `mcp-server-for-wave@${SERVER_VERSION}` });
 
 const localWave = IS_CLOUDFLARE_WORKERS
   ? null
@@ -6081,6 +6119,7 @@ const localWave = IS_CLOUDFLARE_WORKERS
       defaultBusinessId: DEFAULT_BUSINESS_ID,
       writesEnabled: truthyFlag(runtimeConfig.values.WAVE_ALLOW_WRITES?.value),
       runtime: runtimeConfig,
+      onToolError: errorReportingEnabled() ? captureToolError : null,
     });
 
 // --- Exports (Worker and unit tests) ---
@@ -6138,15 +6177,30 @@ if (!IS_CLOUDFLARE_WORKERS) {
   // Without these, an unhandled rejection takes the process down with no
   // usable output, and the MCP client reports only a dead server. Sanitize
   // first: a stack can carry the access token.
+  // Exit after a bounded Sentry flush; without SENTRY_DSN the flush is a
+  // resolved no-op and these exit immediately as before.
+  const exitAfterFlush = (code) => {
+    flushErrorReporting(2000).finally(() => globalThis.process.exit(code));
+  };
+
   globalThis.process.on("uncaughtException", (error) => {
     console.error(`Uncaught exception: ${redactTokens(error?.stack || error)}`);
-    globalThis.process.exit(1);
+    captureFatalError("uncaughtException", error);
+    exitAfterFlush(1);
   });
 
   globalThis.process.on("unhandledRejection", (reason) => {
     console.error(`Unhandled promise rejection: ${redactTokens(reason?.stack || reason)}`);
-    globalThis.process.exit(1);
+    captureFatalError("unhandledRejection", reason);
+    exitAfterFlush(1);
   });
+
+  // Signal handlers replace Node's default termination, so install them only
+  // when there are queued Sentry events to flush.
+  if (errorReportingEnabled()) {
+    globalThis.process.once("SIGTERM", () => exitAfterFlush(143));
+    globalThis.process.once("SIGINT", () => exitAfterFlush(130));
+  }
 }
 
 if (isDirectRun()) {
