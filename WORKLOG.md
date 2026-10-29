@@ -4,7 +4,9 @@
 
 Prepared 2.0.0 with Hono Node adapter 2.1.5 in the root and Worker lockfiles for [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f). The package now declares Node 20 and CI tests Node 20 and 22; the older adapter already required Node 20, so this major release corrects the public compatibility promise. Other dependency versions and Worker overrides are unchanged.
 
-Both full audits report zero vulnerabilities. All 79 root tests pass on Node 20.20.2 and 26.12.1; 51 Worker tests and 38 local OAuth/MCP migration assertions pass. Release consistency, the Node 20 stdio handshake, both packed-install commands and the Worker bundle dry run pass. Public npm delivery remains for final kitchensync. The existing Worker deployment result and rollback version will be recorded after the security cutover; no financial operation ran during these checks.
+Both full audits report zero vulnerabilities. All 79 root tests pass on Node 20.20.2 and 26.12.1; 51 Worker tests and 38 local OAuth/MCP migration assertions pass. Release consistency, the Node 20 stdio handshake, both packed-install commands and the Worker bundle dry run pass. Public npm delivery remains for final kitchensync. No financial operation ran during these checks.
+
+Deployed source `1d108f4` to the existing Wave Worker as `994e2cb3-f9bc-441e-a144-42cc7d21cd74` at 100% traffic, replacing rollback version `a078551e-350e-44cb-8f62-a8016641286a`. The Ames Consulting account, existing resources, routes and variables were preserved, with no storage migration. Homepage, health and OAuth metadata return 200, health reports `ok`, unauthenticated MCP returns 401, hostile Origin returns 403, and security headers match the pre-deploy baseline. Existing transport-transition and temporary-override follow-ups remain open.
 
 ## Current guidance
 
