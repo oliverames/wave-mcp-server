@@ -31,7 +31,7 @@
 
 This Model Context Protocol (MCP) server connects an AI assistant to Wave's accounting API. It covers invoices and payments, estimates and deposits, customers, vendors, products, sales taxes, accounts, and bookkeeping transactions.
 
-The local server and hosted Worker share the same tool definitions. Tools that change or send data stay hidden until write access is enabled. Node.js 18 or later is required for the local package.
+The local server and hosted Worker share the same tool definitions. Tools that change or send data stay hidden until write access is enabled. Node.js 20 or later is required for the local package.
 
 ## Why This Exists
 

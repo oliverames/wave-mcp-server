@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-28
+
+### Security
+
+- Update the root and Worker Hono Node adapters to 2.1.5 for
+  [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f).
+
+### Changed
+
+- Require Node.js 20 or later and remove Node 18 from the CI matrix. The
+  previous dependency already required Node 20; the package now declares
+  that requirement explicitly.
+
 ### Added
 
 - Optional Sentry error reporting for the local server, off unless

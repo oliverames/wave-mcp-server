@@ -1,5 +1,11 @@
 # Worklog
 
+## October 28, 2026: Hono adapter security patch
+
+Prepared 2.0.0 with Hono Node adapter 2.1.5 in the root and Worker lockfiles for [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f). The package now declares Node 20 and CI tests Node 20 and 22; the older adapter already required Node 20, so this major release corrects the public compatibility promise. Other dependency versions and Worker overrides are unchanged.
+
+Both full audits report zero vulnerabilities. All 79 root tests pass on Node 20.20.2 and 26.12.1; 51 Worker tests and 38 local OAuth/MCP migration assertions pass. Release consistency, the Node 20 stdio handshake, both packed-install commands and the Worker bundle dry run pass. Public npm delivery remains for final kitchensync. The existing Worker deployment result and rollback version will be recorded after the security cutover; no financial operation ran during these checks.
+
 ## Current guidance
 
 - [README](README.md) covers installation, tool behavior, configuration and local builds.
