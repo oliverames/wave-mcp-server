@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-10-29 - Verify npm delivery and recent-change checks
+
+**What changed**: Verified the public npm registry serves version 2.0.0, matching the committed package version. Both full maintenance runs found this version already up to date. No new upload ran. The prior publication-pending status is resolved by the registry check.
+
+**Decisions made**: Reused this session's passing `npm test` result: 79 root tests, with zero failures. No source changed in this documentation update.
+
+**Left off at**: The existing Worker deployment and rollback receipt remain as recorded below; no new Worker deployment or financial operation ran. The final full maintenance run passed all eight stages.
+
+**Open questions**: Still open: The existing client transport transition and temporary Worker dependency overrides remain open.
+
+---
+
 ## October 28, 2026: Hono adapter security patch
 
 Prepared 2.0.0 with Hono Node adapter 2.1.5 in the root and Worker lockfiles for [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f). The package now declares Node 20 and CI tests Node 20 and 22; the older adapter already required Node 20, so this major release corrects the public compatibility promise. Other dependency versions and Worker overrides are unchanged.
